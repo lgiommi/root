@@ -12,6 +12,10 @@
 
 #include <exception>
 
+#if defined(_MSC_VER) && (_MSC_VER < 1900) && !defined(noexcept)
+  #define noexcept
+#endif
+
 namespace clang {
   class Sema;
   class Expr;
@@ -42,7 +46,7 @@ namespace cling {
     DerefType m_Type;
   public:
     InvalidDerefException(clang::Sema* S, clang::Expr* E, DerefType type);
-    virtual ~InvalidDerefException();
+    virtual ~InvalidDerefException() noexcept;
 
     const char* what() const noexcept override;
     void diagnose() const override;
