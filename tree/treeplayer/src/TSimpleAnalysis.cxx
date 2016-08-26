@@ -1,4 +1,4 @@
-// @(#)root/tree:$Id$
+// @(#)root/treeplayer:$Id$
 // Author: Luca Giommi   22/08/16
 
 /*************************************************************************
@@ -36,14 +36,9 @@ const std::string TSimpleAnalysis::kCutIntr="if";
 ///
 /// \param[in] kFile name of the input file that has to be read
 
-TSimpleAnalysis::TSimpleAnalysis(const std::string& kFile)
+TSimpleAnalysis::TSimpleAnalysis(const std::string& file)
 {
-   fInputName = kFile;
-   in.open(kFile);
-   if(!in) {
-      ::Error("TSimpleAnalysis","File %s not found",kFile.c_str());
-      throw 1;
-   }
+   fInputName = file;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -256,13 +251,18 @@ void TSimpleAnalysis::Settings()
    std::string line;
    int numbLine = 0;
 
+   in.open(fInputName);
+   if(!in) {
+      ::Error("TSimpleAnalysis","File %s not found",fInputName.c_str());
+      throw 1;
+   }
+
    while(!in.eof()) {
 
       getline (in,line);
       numbLine++;
       if (HandleLines(line,readingSection,numbLine)==1)
          continue;
-      line.erase(std::remove(line.begin(),line.end(),' '),line.end());
 
       switch (readingSection) {
       case kReadingOutput:
