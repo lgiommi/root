@@ -26,10 +26,6 @@
 #include "TFile.h"
 #endif
 
-#ifndef ROOT_TCanvas
-#include "TCanvas.h"
-#endif
-
 #ifndef ROOT_TChain
 #include "TChain.h"
 #endif

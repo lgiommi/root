@@ -9,13 +9,12 @@
  * For the list of contributors see $ROOTSYS/README/CREDITS.             *
  *************************************************************************/
 
+#include "TSimpleAnalysis.h"
 
 #include <string>
-#include <iostream>
 #include <fstream>
 #include <vector>
 
-#include "TSimpleAnalysis.h"
 #include "TFile.h"
 #include "TCanvas.h"
 #include "TChain.h"
