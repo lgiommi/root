@@ -212,8 +212,8 @@ std::string TSimpleAnalysis::SkipSubsequentEmptyLines(Int_t& numbLine)
    std::string notEmptyLine;
 
    while (getline(in,notEmptyLine) && DeleteSpaces(notEmptyLine)
-          && (notEmptyLine.empty() || notEmptyLine.find("//") == 0))
-      {numbLine++;}
+          && (notEmptyLine.empty() || notEmptyLine.find("#") == 0 ||
+              notEmptyLine.find_first_not_of(" ") == std::string::npos))
 
    numbLine++;
    return notEmptyLine;
@@ -236,13 +236,14 @@ Bool_t TSimpleAnalysis::HandleLines(std::string& line, Int_t& readingSection, In
       line = SkipSubsequentEmptyLines(numbLine);
    }
 
-   line.erase(std::remove(line.begin(),line.end(),' '),line.end());
-   std::size_t comment = line.find("//");
+   DeleteSpaces(line);
+   std::size_t comment = line.find("#");
    if (comment==0)
       return 1;
    if (((comment != 0) || (comment != std::string::npos)) && readingSection == 0)
       fCounter++;
    line = line.substr(0,comment);
+   DeleteSpaces(line);
    return 0;
 }
 
