@@ -276,9 +276,9 @@ void TSimpleAnalysis::Settings()
 
          if (HandleTreeNameConfig(line) == true) {
             fTreeName = line;
+            readingSection = kReadingExpressions;
          }
          else {
-            readingSection = kReadingExpressions;
             HandlefExpressionConfig(line,numbLine);
          }
          break;
