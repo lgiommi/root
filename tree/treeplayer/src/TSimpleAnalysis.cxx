@@ -168,6 +168,7 @@ void TSimpleAnalysis::HandlefExpressionConfig(std::string& line, int& numbLine)
               "No hname found in %s:%d",fInputName.c_str(), numbLine);
       throw 2;
    }
+   DeleteSpaces(substring);
    fHNames.push_back(substring);
    substring=line.substr(equal+1,cutPos-equal-1);
    if (substring.empty()) {
@@ -175,6 +176,7 @@ void TSimpleAnalysis::HandlefExpressionConfig(std::string& line, int& numbLine)
               "No expression found in %s:%d",fInputName.c_str(), numbLine);
       throw 3;
    }
+   DeleteSpaces(substring);
    fExpressions.push_back(substring);
    if (cutPos == std::string::npos) {
       fCut.push_back("");
@@ -190,7 +192,12 @@ void TSimpleAnalysis::HandlefExpressionConfig(std::string& line, int& numbLine)
 
 Bool_t TSimpleAnalysis::DeleteSpaces (std::string& line)
 {
-   line.erase(std::remove(line.begin(),line.end(),' '),line.end());
+   std::size_t firstNotSpace = line.find_first_not_of(" ");
+   if (firstNotSpace != std::string::npos)
+      line = line.substr(firstNotSpace,line.size()-firstNotSpace);
+   std::size_t lastNotSpace = line.find_last_not_of(" ");
+   if (lastNotSpace != std::string::npos)
+      line = line.substr(0,lastNotSpace+1);
    return 1;
 }
 
