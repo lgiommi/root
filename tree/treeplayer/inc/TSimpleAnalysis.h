@@ -90,7 +90,7 @@ private:
 
 
 public:
-   TSimpleAnalysis(const std::string& kFile);
+   TSimpleAnalysis(const std::string& file);
    TSimpleAnalysis(const std::string& output, const std::vector<std::string>& inputFiles,
                    const std::string& name, std::vector<std::string> expressions);
    bool Analysis();

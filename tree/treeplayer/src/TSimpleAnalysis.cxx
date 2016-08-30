@@ -2,7 +2,7 @@
 // Author: Luca Giommi   22/08/16
 
 /*************************************************************************
- * Copyright (C) 1995-2000, Rene Brun and Fons Rademakers.               *
+ * Copyright (C) 1995-2016, Rene Brun and Fons Rademakers.               *
  * All rights reserved.                                                  *
  *                                                                       *
  * For the licensing terms see $ROOTSYS/LICENSE.                         *
@@ -34,10 +34,8 @@ const std::string TSimpleAnalysis::kCutIntr="if";
 ///
 /// \param[in] kFile name of the input file that has to be read
 
-TSimpleAnalysis::TSimpleAnalysis(const std::string& file)
-{
-   fInputName = file;
-}
+TSimpleAnalysis::TSimpleAnalysis(const std::string& file): fInputName(file)
+{}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Constructor for the case of command line parsing arguments
@@ -48,12 +46,9 @@ TSimpleAnalysis::TSimpleAnalysis(const std::string& file)
 /// \param[in] expressions what is showed in the histograms
 
 TSimpleAnalysis::TSimpleAnalysis(const std::string& output, const std::vector<std::string>& inputFiles,
-                                 const std::string& name, std::vector<std::string> expressions)
+                                 const std::string& name, std::vector<std::string> expressions):
+   fInputFiles(inputFiles), fOutputFile(output), fTreeName(name)
 {
-   fOutputFile=output;
-   fTreeName=name;
-   for (std::string input: inputFiles)
-      fInputFiles.push_back(input);
    for (std::string expr: expressions) {
       std::size_t equal=expr.find("=");
       if (equal == std::string::npos) {
