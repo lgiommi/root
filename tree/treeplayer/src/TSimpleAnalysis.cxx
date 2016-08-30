@@ -16,15 +16,14 @@
 #include <vector>
 
 #include "TFile.h"
-#include "TCanvas.h"
 #include "TChain.h"
 #include "TH1.h"
 #include "TError.h"
 
 /** \class TSympleAnalysis
-A TSimpleAnalysis object permit to, given an input file or through
-command line, create an .root file in which are saved histograms
-that the user want to create.
+A TSimpleAnalysis object permit to, given an input file,
+create an .root file in which are saved histograms
+that the user wants to create.
 */
 
 const std::string TSimpleAnalysis::kCutIntr="if";
@@ -69,7 +68,7 @@ TSimpleAnalysis::TSimpleAnalysis(const std::string& output, std::vector<std::str
                  "No hname found in %s",expr.c_str());
          throw 2;
       }
-      fHNames.push_back(substring);
+      fHistNames.push_back(substring);
       substring=expr.substr(equal+1,cutPos-equal-1);
       if (substring.empty()) {
          ::Error("TSimpleAnalysis",
@@ -117,11 +116,11 @@ Bool_t TSimpleAnalysis::Analysis()
       chain.Add(inputfile.c_str());
    TFile ofile(fOutputFile.c_str(),"RECREATE");
 
-   CheckHNames(fHNames);
+   CheckHNames(fHistNames);
 
    for (unsigned i=0; i<fExpressions.size(); i++) {
-      chain.Draw((fExpressions[i] + ">>" + fHNames[i]).c_str(),fCut[i].c_str(),"goff");
-      TH1F *histo = (TH1F*)gDirectory->Get(fHNames[i].c_str());
+      chain.Draw((fExpressions[i] + ">>" + fHistNames[i]).c_str(),fCut[i].c_str(),"goff");
+      TH1F *histo = (TH1F*)gDirectory->Get(fHistNames[i].c_str());
       histo->Write();
    }
 
@@ -163,7 +162,7 @@ void TSimpleAnalysis::HandlefExpressionConfig(std::string& line, int& numbLine)
       throw 2;
    }
    DeleteSpaces(substring);
-   fHNames.push_back(substring);
+   fHistNames.push_back(substring);
    substring=line.substr(equal+1,cutPos-equal-1);
    if (substring.empty()) {
       ::Error("TSimpleAnalysis::HandlefExpressionConfig",
@@ -205,7 +204,7 @@ std::string TSimpleAnalysis::SkipSubsequentEmptyLines(Int_t& numbLine)
 {
    std::string notEmptyLine;
 
-   while (getline(in,notEmptyLine) && DeleteSpaces(notEmptyLine)
+   while (getline(fIn,notEmptyLine) && DeleteSpaces(notEmptyLine)
           && (notEmptyLine.empty() || notEmptyLine.find("#") == 0 ||
               notEmptyLine.find_first_not_of(" ") == std::string::npos))
 
@@ -250,15 +249,15 @@ void TSimpleAnalysis::Settings()
    std::string line;
    int numbLine = 0;
 
-   in.open(fInputName);
-   if(!in) {
+   fIn.open(fInputName);
+   if(!fIn) {
       ::Error("TSimpleAnalysis","File %s not found",fInputName.c_str());
       throw 1;
    }
 
-   while(!in.eof()) {
+   while(!fIn.eof()) {
 
-      getline (in,line);
+      getline (fIn,line);
       numbLine++;
       if (HandleLines(line,readingSection,numbLine)==1)
          continue;
