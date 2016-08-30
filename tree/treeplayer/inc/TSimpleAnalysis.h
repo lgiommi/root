@@ -36,8 +36,8 @@
 // hsimple2.root   #second .root input file                             //
 // #the next line has to be an empty line                               //
 //                                                                      //
-// #The next line has the name of the Ntuple of the input data          //
-// ntuple   #name of the Ntuple                                         //
+// #The next line has the name of the tree of the input data            //
+// ntuple   #name of the input tree                                     //
 // #The next block is composed by lines that allow to configure the     //
 // #histograms. They have to be the follow sintax:                      //
 // #hName=hExpr if hCut   #where:                                       //
@@ -75,23 +75,28 @@ private:
 
    //The elements of the enumeration refer to the different typologies of elements
    //that are in the input file
-   enum EReadingWhat {kReadingOutput,kReadingInput,kReadingTreeName,
-                      kReadingExpressions,kEndOfFile};
-   static const std::string kCutIntr;   ///< The string that represents the starter point of the cut expresson
-   Int_t fCounter=0;   ///< Counter usefull for the reading of the file
+   enum EReadingWhat {
+      kReadingOutput,
+      kReadingInput,
+      kReadingTreeName,
+      kReadingExpressions,
+      kEndOfFile
+   };
+   static const std::string kCutIntr; ///< The string that represents the starter point of the cut expresson
+   Int_t fCounter=0; ///< Counter usefull for the reading of the file
 
 public:
    TSimpleAnalysis(const std::string& kFile);
-   TSimpleAnalysis(const std::string& output, std::vector<std::string> inputFiles,
+   TSimpleAnalysis(const std::string& output, const std::vector<std::string>& inputFiles,
                    const std::string& name, std::vector<std::string> expressions);
    void CheckHNames(std::vector<std::string> name);
-   Bool_t Analysis();
-   Bool_t HandleTreeNameConfig(const std::string& line);
-   void HandlefExpressionConfig(std::string& line, Int_t& numbLine);
-   Bool_t DeleteSpaces (std::string& line);
+   bool Analysis();
+   bool HandleTreeNameConfig(const std::string& line);
+   void HandleExpressionConfig(std::string& line, Int_t& numbLine);
+   bool DeleteSpaces(std::string& line);
    std::string SkipSubsequentEmptyLines(Int_t& numbLine);
-   Bool_t HandleLines(std::string& line, Int_t& readingSection, Int_t& numbLine);
-   void Settings();
+   bool HandleLines(std::string& line, Int_t& readingSection, Int_t& numbLine);
+   void Configure();
 
 };
 

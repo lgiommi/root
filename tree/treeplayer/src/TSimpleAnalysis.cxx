@@ -47,7 +47,7 @@ TSimpleAnalysis::TSimpleAnalysis(const std::string& file)
 /// \param[in] name name of the tree
 /// \param[in] expressions what is showed in the histograms
 
-TSimpleAnalysis::TSimpleAnalysis(const std::string& output, std::vector<std::string> inputFiles,
+TSimpleAnalysis::TSimpleAnalysis(const std::string& output, const std::vector<std::string>& inputFiles,
                                  const std::string& name, std::vector<std::string> expressions)
 {
    fOutputFile=output;
@@ -109,7 +109,7 @@ void TSimpleAnalysis::CheckHNames(std::vector<std::string> name)
 ////////////////////////////////////////////////////////////////////////////////
 /// Return true if the input arguments create the output file correctly
 
-Bool_t TSimpleAnalysis::Analysis()
+bool TSimpleAnalysis::Analysis()
 {
    TChain chain(fTreeName.c_str());
    for (const std::string& inputfile: fInputFiles)
@@ -132,7 +132,7 @@ Bool_t TSimpleAnalysis::Analysis()
 ///
 /// param[in] line line read from the input file
 
-Bool_t TSimpleAnalysis::HandleTreeNameConfig(const std::string& line)
+bool TSimpleAnalysis::HandleTreeNameConfig(const std::string& line)
 {
    if (line.find("=") != std::string::npos)
       return false;
@@ -146,7 +146,7 @@ Bool_t TSimpleAnalysis::HandleTreeNameConfig(const std::string& line)
 /// param[in] line line read from the input file
 /// param[in] numbLine number of the input file line
 
-void TSimpleAnalysis::HandlefExpressionConfig(std::string& line, int& numbLine)
+void TSimpleAnalysis::HandleExpressionConfig(std::string& line, int& numbLine)
 {
    std::size_t equal=line.find("=");
    if (equal == std::string::npos) {
@@ -220,7 +220,7 @@ std::string TSimpleAnalysis::SkipSubsequentEmptyLines(Int_t& numbLine)
 /// param[in] readingSection current section of the read file
 /// param[in] numbLine number of the input file line
 
-Bool_t TSimpleAnalysis::HandleLines(std::string& line, Int_t& readingSection, Int_t& numbLine)
+bool TSimpleAnalysis::HandleLines(std::string& line, Int_t& readingSection, Int_t& numbLine)
 {
    if (line.empty() || line.find_first_not_of(" ") == std::string::npos) {
       if (readingSection == 0 && fCounter == 0)
@@ -243,7 +243,7 @@ Bool_t TSimpleAnalysis::HandleLines(std::string& line, Int_t& readingSection, In
 ////////////////////////////////////////////////////////////////////////////////
 /// This function has the aim of setting the arguments read from the input file
 
-void TSimpleAnalysis::Settings()
+void TSimpleAnalysis::Configure()
 {
    int readingSection = kReadingOutput;
    std::string line;
@@ -278,12 +278,12 @@ void TSimpleAnalysis::Settings()
             readingSection = kReadingExpressions;
          }
          else {
-            HandlefExpressionConfig(line,numbLine);
+            HandleExpressionConfig(line,numbLine);
          }
          break;
 
       case kReadingExpressions:
-         HandlefExpressionConfig(line,numbLine);
+         HandleExpressionConfig(line,numbLine);
          break;
 
       case kEndOfFile: break;
