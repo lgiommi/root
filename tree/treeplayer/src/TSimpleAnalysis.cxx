@@ -14,6 +14,7 @@
 #include <string>
 #include <fstream>
 #include <vector>
+#include <map>
 
 #include "TFile.h"
 #include "TChain.h"
@@ -49,11 +50,14 @@ TSimpleAnalysis::TSimpleAnalysis(const std::string& output, const std::vector<st
                                  const std::string& name, std::vector<std::string> expressions):
    fInputFiles(inputFiles), fOutputFile(output), fTreeName(name)
 {
+   std::string histExpressions;
+   std::string histNames;
+   std::string histCut;
    for (std::string expr: expressions) {
       std::size_t equal=expr.find("=");
       if (equal == std::string::npos) {
          ::Error("TSimpleAnalysis",
-                 "Missing '=' in fExpressions in %s",expr.c_str());
+                 "Missing '=' in %s",expr.c_str());
          throw std::runtime_error("Error");
       }
       std::size_t cutPos=expr.find(kCutIntr, equal);
@@ -63,42 +67,27 @@ TSimpleAnalysis::TSimpleAnalysis(const std::string& output, const std::vector<st
                  "No hname found in %s",expr.c_str());
          throw std::runtime_error("Error");
       }
-      fHistNames.push_back(substring);
+      histNames.append(substring);
       substring=expr.substr(equal+1,cutPos-equal-1);
       if (substring.empty()) {
          ::Error("TSimpleAnalysis",
                  "No expression found in %s",expr.c_str());
          throw std::runtime_error("Error");
       }
-      fExpressions.push_back(substring);
+      histExpressions.append(substring);
       if (cutPos == std::string::npos) {
-         fCut.push_back("");
+         histCut.append("");
       } else {
-         fCut.push_back(expr.substr(cutPos+kCutIntr.size()));
+         histCut.append(expr.substr(cutPos+kCutIntr.size()));
       }
    }
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-/// Tell if the name of some histograms that will be created are the same
-///
-/// param[in] name name of the histograms
-
-static void CheckHNames(std::vector<std::string> name)
-{
-   int err=0;
-   for (unsigned i=0; i<name.size()-1; i++)
-      for (unsigned j=i+1; j<name.size(); j++) {
-         if (name[i] == name[j]) {
-            ::Error("TSimpleAnalysis::check_name",
-                    "Multiple %s in the names of histograms (position %d and %d)",
-                    name[i].c_str(), i, j);
-            err++;
-         }
-      }
-   if (err != 0)
-      throw 1;
+   auto check =
+      fHists.insert(std::make_pair((const std::string&)histNames,
+                                   std::make_pair(histExpressions,histCut)));
+   if (check.second==false) {
+      ::Error("TSimpleAnalysis","The histogram name '%s' is already existing", histNames.c_str());
+      throw std::runtime_error("Name of the histogram already existing");
+   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -111,14 +100,13 @@ bool TSimpleAnalysis::Analysis()
       chain.Add(inputfile.c_str());
    TFile ofile(fOutputFile.c_str(),"RECREATE");
 
-   CheckHNames(fHistNames);
-
-   for (unsigned i = 0; i < fExpressions.size(); i++) {
-      chain.Draw((fExpressions[i] + ">>" + fHistNames[i]).c_str(), fCut[i].c_str(), "goff");
-      TH1F *histo = (TH1F*)gDirectory->Get(fHistNames[i].c_str());
-      histo->Write();
+   for (const auto &histo : fHists) {
+      chain.Draw((histo.second.first + ">>" + histo.first).c_str(), histo.second.second.c_str(), "goff");
+      TH1F *ptrHisto = (TH1F*)gDirectory->Get(histo.first.c_str());
+      ptrHisto->Write();
+      if (ptrHisto == nullptr)
+         return false;
    }
-
    return true;
 }
 
@@ -129,9 +117,7 @@ bool TSimpleAnalysis::Analysis()
 
 static bool HandleTreeNameConfig(const std::string& line)
 {
-   if (line.find("=") != std::string::npos)
-      return false;
-   else return true;
+   return line.find("=") == std::string::npos;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -159,10 +145,13 @@ static bool DeleteSpaces(std::string& line)
 
 void TSimpleAnalysis::HandleExpressionConfig(std::string& line, int& numbLine)
 {
+   std::string histExpressions;
+   std::string histNames;
+   std::string histCut;
    std::size_t equal = line.find("=");
    if (equal == std::string::npos) {
       ::Error("TSimpleAnalysis::HandlefExpressionConfig",
-              "Missing '=' in fExpressions in %s:%d",fInputName.c_str(), numbLine);
+              "Missing '=' in %s:%d",fInputName.c_str(), numbLine);
       throw std::runtime_error("Error");
    }
    std::size_t cutPos = line.find(kCutIntr, equal);
@@ -173,7 +162,7 @@ void TSimpleAnalysis::HandleExpressionConfig(std::string& line, int& numbLine)
       throw std::runtime_error("Error");
    }
    DeleteSpaces(substring);
-   fHistNames.push_back(substring);
+   histNames.append(substring);
    substring=line.substr(equal+1,cutPos-equal-1);
    if (substring.empty()) {
       ::Error("TSimpleAnalysis::HandlefExpressionConfig",
@@ -181,11 +170,20 @@ void TSimpleAnalysis::HandleExpressionConfig(std::string& line, int& numbLine)
       throw std::runtime_error("Error");
    }
    DeleteSpaces(substring);
-   fExpressions.push_back(substring);
+   histExpressions.append(substring);
    if (cutPos == std::string::npos) {
-      fCut.push_back("");
+      histCut.append("");
    } else {
-      fCut.push_back(line.substr(cutPos+kCutIntr.size()));
+      histCut.append(line.substr(cutPos+kCutIntr.size()));
+   }
+
+    auto check =
+      fHists.insert(std::make_pair((const std::string&)histNames,
+                                   std::make_pair(histExpressions,histCut)));
+   if (check.second==false) {
+      ::Error("TSimpleAnalysis::HandleExpressionConfig",
+              "The histogram name '%s' is already existing", histNames.c_str());
+      throw std::runtime_error("Name of the histogram already existing");
    }
 }
 

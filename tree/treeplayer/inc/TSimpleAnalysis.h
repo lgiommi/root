@@ -22,8 +22,8 @@
 // to create the histograms. This file has a fixed sintax, in which are //
 // allowed comments (marked with the '#' sign) at the beginning of the  //
 // line (less than whitespaces), or at the end of the configuration     //
-// line. Subsequently empty and/or comment lines or both are skipped    //
-// from the configuration procedure.                                    //
+// line. Subsequently empty or comment lines or both are skipped from   //
+// the configuration procedure.                                         //
 // Here an example of configuration file:                               //
 //                                                                      //
 // #This is an example of configuration file                            //
@@ -57,18 +57,19 @@
 #include <string>
 #include <fstream>
 #include <vector>
+#include <map>
 
 class TSimpleAnalysis {
 
 private:
    std::string              fInputName; ///< Name of the input file
    std::vector<std::string> fInputFiles; ///< .root input files
-   std::vector<std::string> fExpressions; ///< What is showed by the histograms inside the output file
-   std::vector<std::string> fHistNames; ///< Names of the histograms
-   std::vector<std::string> fCut; ///< Cuts added to the hisograms
    std::string              fOutputFile; ///< Output file in which are stored the histograms
    std::string              fTreeName; ///< Name of the input tree
    std::ifstream            fIn; ///< Stream for the input file
+   std::map<std::string, std::pair<std::string, std::string>> fHists; ///< contains
+   //in the first part the names of the histograms written in the output file, in the
+   //second part the pair of what is showed in the histograms and the cut applied on the variables
 
    //The elements of the enumeration refer to the different typologies of elements
    //that are in the input file
