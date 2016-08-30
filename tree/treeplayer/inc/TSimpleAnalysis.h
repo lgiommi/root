@@ -84,18 +84,16 @@ private:
    };
    static const std::string kCutIntr; ///< The string that represents the starter point of the cut expresson
    Int_t fCounter=0; ///< Counter usefull for the reading of the file
+   void HandleExpressionConfig(std::string& line, Int_t& numbLine);
+   std::string SkipSubsequentEmptyLines(Int_t& numbLine);
+   bool HandleLines(std::string& line, Int_t& readingSection, Int_t& numbLine);
+
 
 public:
    TSimpleAnalysis(const std::string& kFile);
    TSimpleAnalysis(const std::string& output, const std::vector<std::string>& inputFiles,
                    const std::string& name, std::vector<std::string> expressions);
-   void CheckHNames(std::vector<std::string> name);
    bool Analysis();
-   bool HandleTreeNameConfig(const std::string& line);
-   void HandleExpressionConfig(std::string& line, Int_t& numbLine);
-   bool DeleteSpaces(std::string& line);
-   std::string SkipSubsequentEmptyLines(Int_t& numbLine);
-   bool HandleLines(std::string& line, Int_t& readingSection, Int_t& numbLine);
    void Configure();
 
 };

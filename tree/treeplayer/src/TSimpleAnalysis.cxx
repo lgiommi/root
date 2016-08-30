@@ -90,7 +90,7 @@ TSimpleAnalysis::TSimpleAnalysis(const std::string& output, const std::vector<st
 ///
 /// param[in] name name of the histograms
 
-void TSimpleAnalysis::CheckHNames(std::vector<std::string> name)
+static void CheckHNames(std::vector<std::string> name)
 {
    Int_t err=0;
    for (unsigned i=0; i<name.size()-1; i++)
@@ -132,11 +132,27 @@ bool TSimpleAnalysis::Analysis()
 ///
 /// param[in] line line read from the input file
 
-bool TSimpleAnalysis::HandleTreeNameConfig(const std::string& line)
+static bool HandleTreeNameConfig(const std::string& line)
 {
    if (line.find("=") != std::string::npos)
       return false;
    else return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// Delete white spaces in a string
+///
+/// param[in] line line read from the input file
+
+static bool DeleteSpaces (std::string& line)
+{
+   std::size_t firstNotSpace = line.find_first_not_of(" ");
+   if (firstNotSpace != std::string::npos)
+      line = line.substr(firstNotSpace,line.size()-firstNotSpace);
+   std::size_t lastNotSpace = line.find_last_not_of(" ");
+   if (lastNotSpace != std::string::npos)
+      line = line.substr(0,lastNotSpace+1);
+   return 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -178,21 +194,6 @@ void TSimpleAnalysis::HandleExpressionConfig(std::string& line, int& numbLine)
    }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-/// Delete white spaces in a string
-///
-/// param[in] line line read from the input file
-
-Bool_t TSimpleAnalysis::DeleteSpaces (std::string& line)
-{
-   std::size_t firstNotSpace = line.find_first_not_of(" ");
-   if (firstNotSpace != std::string::npos)
-      line = line.substr(firstNotSpace,line.size()-firstNotSpace);
-   std::size_t lastNotSpace = line.find_last_not_of(" ");
-   if (lastNotSpace != std::string::npos)
-      line = line.substr(0,lastNotSpace+1);
-   return 1;
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Skip subsequent empty lines in a string and returns the number of the
