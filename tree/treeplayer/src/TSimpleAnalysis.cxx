@@ -54,21 +54,21 @@ TSimpleAnalysis::TSimpleAnalysis(const std::string& output, const std::vector<st
       if (equal == std::string::npos) {
          ::Error("TSimpleAnalysis",
                  "Missing '=' in fExpressions in %s",expr.c_str());
-         throw 1;
+         throw std::runtime_error("Error");
       }
       std::size_t cutPos=expr.find(kCutIntr, equal);
       std::string substring=expr.substr(0,equal);
       if (substring.empty()) {
          ::Error("TSimpleAnalysis",
                  "No hname found in %s",expr.c_str());
-         throw 2;
+         throw std::runtime_error("Error");
       }
       fHistNames.push_back(substring);
       substring=expr.substr(equal+1,cutPos-equal-1);
       if (substring.empty()) {
          ::Error("TSimpleAnalysis",
                  "No expression found in %s",expr.c_str());
-         throw 3;
+         throw std::runtime_error("Error");
       }
       fExpressions.push_back(substring);
       if (cutPos == std::string::npos) {
@@ -87,7 +87,7 @@ TSimpleAnalysis::TSimpleAnalysis(const std::string& output, const std::vector<st
 
 static void CheckHNames(std::vector<std::string> name)
 {
-   Int_t err=0;
+   int err=0;
    for (unsigned i=0; i<name.size()-1; i++)
       for (unsigned j=i+1; j<name.size(); j++) {
          if (name[i] == name[j]) {
@@ -113,8 +113,8 @@ bool TSimpleAnalysis::Analysis()
 
    CheckHNames(fHistNames);
 
-   for (unsigned i=0; i<fExpressions.size(); i++) {
-      chain.Draw((fExpressions[i] + ">>" + fHistNames[i]).c_str(),fCut[i].c_str(),"goff");
+   for (unsigned i = 0; i < fExpressions.size(); i++) {
+      chain.Draw((fExpressions[i] + ">>" + fHistNames[i]).c_str(), fCut[i].c_str(), "goff");
       TH1F *histo = (TH1F*)gDirectory->Get(fHistNames[i].c_str());
       histo->Write();
    }
@@ -139,7 +139,7 @@ static bool HandleTreeNameConfig(const std::string& line)
 ///
 /// param[in] line line read from the input file
 
-static bool DeleteSpaces (std::string& line)
+static bool DeleteSpaces(std::string& line)
 {
    std::size_t firstNotSpace = line.find_first_not_of(" ");
    if (firstNotSpace != std::string::npos)
@@ -159,18 +159,18 @@ static bool DeleteSpaces (std::string& line)
 
 void TSimpleAnalysis::HandleExpressionConfig(std::string& line, int& numbLine)
 {
-   std::size_t equal=line.find("=");
+   std::size_t equal = line.find("=");
    if (equal == std::string::npos) {
       ::Error("TSimpleAnalysis::HandlefExpressionConfig",
               "Missing '=' in fExpressions in %s:%d",fInputName.c_str(), numbLine);
-      throw 1;
+      throw std::runtime_error("Error");
    }
-   std::size_t cutPos=line.find(kCutIntr, equal);
+   std::size_t cutPos = line.find(kCutIntr, equal);
    std::string substring=line.substr(0,equal);
    if (substring.empty()) {
       ::Error("TSimpleAnalysis::HandlefExpressionConfig",
               "No hname found in %s:%d",fInputName.c_str(), numbLine);
-      throw 2;
+      throw std::runtime_error("Error");
    }
    DeleteSpaces(substring);
    fHistNames.push_back(substring);
@@ -178,7 +178,7 @@ void TSimpleAnalysis::HandleExpressionConfig(std::string& line, int& numbLine)
    if (substring.empty()) {
       ::Error("TSimpleAnalysis::HandlefExpressionConfig",
               "No expression found in %s:%d",fInputName.c_str(), numbLine);
-      throw 3;
+      throw std::runtime_error("Error");
    }
    DeleteSpaces(substring);
    fExpressions.push_back(substring);
@@ -196,7 +196,7 @@ void TSimpleAnalysis::HandleExpressionConfig(std::string& line, int& numbLine)
 ///
 /// param[in] numbLine number of the input file line
 
-std::string TSimpleAnalysis::SkipSubsequentEmptyLines(Int_t& numbLine)
+std::string TSimpleAnalysis::SkipSubsequentEmptyLines(int& numbLine)
 {
    std::string notEmptyLine;
 
@@ -216,7 +216,7 @@ std::string TSimpleAnalysis::SkipSubsequentEmptyLines(Int_t& numbLine)
 /// param[in] readingSection current section of the read file
 /// param[in] numbLine number of the input file line
 
-bool TSimpleAnalysis::HandleLines(std::string& line, Int_t& readingSection, Int_t& numbLine)
+bool TSimpleAnalysis::HandleLines(std::string& line, int& readingSection, int& numbLine)
 {
    if (line.empty() || line.find_first_not_of(" ") == std::string::npos) {
       if (readingSection == 0 && fCounter == 0)
@@ -248,7 +248,7 @@ void TSimpleAnalysis::Configure()
    fIn.open(fInputName);
    if(!fIn) {
       ::Error("TSimpleAnalysis","File %s not found",fInputName.c_str());
-      throw 1;
+      throw std::runtime_error("Error");
    }
 
    while(!fIn.eof()) {

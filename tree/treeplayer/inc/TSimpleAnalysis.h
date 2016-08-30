@@ -53,9 +53,6 @@
 //                                                                      //
 //////////////////////////////////////////////////////////////////////////
 
-#ifndef ROOT_TObject
-#include "TObject.h"
-#endif
 
 #include <string>
 #include <fstream>
@@ -83,10 +80,10 @@ private:
       kEndOfFile
    };
    static const std::string kCutIntr; ///< The string that represents the starter point of the cut expresson
-   Int_t fCounter=0; ///< Counter usefull for the reading of the file
-   void HandleExpressionConfig(std::string& line, Int_t& numbLine);
-   std::string SkipSubsequentEmptyLines(Int_t& numbLine);
-   bool HandleLines(std::string& line, Int_t& readingSection, Int_t& numbLine);
+   int fCounter=0; ///< Counter usefull for the reading of the file
+   void HandleExpressionConfig(std::string& line, int& numbLine);
+   std::string SkipSubsequentEmptyLines(int& numbLine);
+   bool HandleLines(std::string& line, int& readingSection, int& numbLine);
 
 
 public:
