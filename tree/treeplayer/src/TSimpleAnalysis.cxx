@@ -238,3 +238,15 @@ bool TSimpleAnalysis::Configure()
    }
    return true;
 }
+
+////////////////////////////////////////////////////////////////////////////////
+/// Function that allows to create the TSimpleAnalysis object and execute its
+/// Configure and Analyze functions.
+///
+/// param[in] input name of the input file used to create the TSimpleAnalysis object
+
+bool RunSimpleAnalysis (const char* input) {
+   TSimpleAnalysis obj(input);
+   obj.Configure();
+   obj.Analyze();
+}

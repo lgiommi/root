@@ -96,4 +96,6 @@ public:
 
 };
 
+bool RunSimpleAnalysis(const char* input);
+
 #endif
