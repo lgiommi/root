@@ -29,6 +29,54 @@ that the user wants to create.
 
 const std::string TSimpleAnalysis::kCutIntr="if";
 
+////////////////////////////////////////////////////////////////////////////////
+/// Delete white spaces in a string
+///
+/// param[in] line line read from the input file
+
+static bool DeleteSpaces(std::string& line)
+{
+   std::size_t firstNotSpace = line.find_first_not_of(" ");
+   if (firstNotSpace != std::string::npos)
+      line = line.substr(firstNotSpace, line.size()-firstNotSpace);
+   std::size_t lastNotSpace = line.find_last_not_of(" ");
+   if (lastNotSpace != std::string::npos)
+      line = line.substr(0, lastNotSpace+1);
+   return 1;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// It handles the expression lines of the input file in order to pass the
+/// elements to the members of the object
+///
+/// param[in] line line read from the input file or the expression passed to the constructor
+
+std::string TSimpleAnalysis::HandleExpressionConfig(std::string& line)
+{
+   std::size_t equal = line.find("=");
+   if (equal == std::string::npos)
+      return "Error: missing '='";
+   std::size_t cutPos = line.find(kCutIntr, equal);
+   std::string histName = line.substr(0, equal);
+   if (histName.empty())
+      return "Error: no histName found";
+   DeleteSpaces(histName);
+
+   std::string histExpression = line.substr(equal+1, cutPos-equal-1);
+   if (histExpression.empty())
+      return "Error: no expression found";
+   DeleteSpaces(histExpression);
+
+   std::string histCut;
+   if (cutPos != std::string::npos)
+      histCut = line.substr(cutPos+kCutIntr.size());
+
+   auto check = fHists.insert(std::make_pair((const std::string&)histName,
+                                             std::make_pair(histExpression, histCut)));
+   if (!check.second)
+      return "Name of the histogram already existing";
+   return "";
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Constructor for the case with the input file
@@ -50,55 +98,22 @@ TSimpleAnalysis::TSimpleAnalysis(const std::string& output, const std::vector<st
                                  const std::string& name, std::vector<std::string> expressions):
    fInputFiles(inputFiles), fOutputFile(output), fTreeName(name)
 {
-   std::string histExpressions;
-   std::string histNames;
-   std::string histCut;
-   for (std::string expr: expressions) {
-      std::size_t equal=expr.find("=");
-      if (equal == std::string::npos) {
-         ::Error("TSimpleAnalysis",
-                 "Missing '=' in %s",expr.c_str());
-         throw std::runtime_error("Error");
+      for (std::string expr: expressions) {
+        std::string errMessage = HandleExpressionConfig(expr);
+         if (!errMessage.empty())
+            throw std::runtime_error(errMessage + " in " +  expr);
       }
-      std::size_t cutPos=expr.find(kCutIntr, equal);
-      std::string substring=expr.substr(0,equal);
-      if (substring.empty()) {
-         ::Error("TSimpleAnalysis",
-                 "No hname found in %s",expr.c_str());
-         throw std::runtime_error("Error");
-      }
-      histNames.append(substring);
-      substring=expr.substr(equal+1,cutPos-equal-1);
-      if (substring.empty()) {
-         ::Error("TSimpleAnalysis",
-                 "No expression found in %s",expr.c_str());
-         throw std::runtime_error("Error");
-      }
-      histExpressions.append(substring);
-      if (cutPos == std::string::npos) {
-         histCut.append("");
-      } else {
-         histCut.append(expr.substr(cutPos+kCutIntr.size()));
-      }
-   }
-   auto check =
-      fHists.insert(std::make_pair((const std::string&)histNames,
-                                   std::make_pair(histExpressions,histCut)));
-   if (check.second==false) {
-      ::Error("TSimpleAnalysis","The histogram name '%s' is already existing", histNames.c_str());
-      throw std::runtime_error("Name of the histogram already existing");
-   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Return true if the input arguments create the output file correctly
 
-bool TSimpleAnalysis::Analysis()
+bool TSimpleAnalysis::Analyze()
 {
    TChain chain(fTreeName.c_str());
    for (const std::string& inputfile: fInputFiles)
       chain.Add(inputfile.c_str());
-   TFile ofile(fOutputFile.c_str(),"RECREATE");
+   TFile ofile(fOutputFile.c_str(), "RECREATE");
 
    for (const auto &histo : fHists) {
       chain.Draw((histo.second.first + ">>" + histo.first).c_str(), histo.second.second.c_str(), "goff");
@@ -120,73 +135,6 @@ static bool HandleTreeNameConfig(const std::string& line)
    return line.find("=") == std::string::npos;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-/// Delete white spaces in a string
-///
-/// param[in] line line read from the input file
-
-static bool DeleteSpaces(std::string& line)
-{
-   std::size_t firstNotSpace = line.find_first_not_of(" ");
-   if (firstNotSpace != std::string::npos)
-      line = line.substr(firstNotSpace,line.size()-firstNotSpace);
-   std::size_t lastNotSpace = line.find_last_not_of(" ");
-   if (lastNotSpace != std::string::npos)
-      line = line.substr(0,lastNotSpace+1);
-   return 1;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// It handles the expression lines of the input file in order to pass the
-/// elements to the members of the object
-///
-/// param[in] line line read from the input file
-/// param[in] numbLine number of the input file line
-
-void TSimpleAnalysis::HandleExpressionConfig(std::string& line, int& numbLine)
-{
-   std::string histExpressions;
-   std::string histNames;
-   std::string histCut;
-   std::size_t equal = line.find("=");
-   if (equal == std::string::npos) {
-      ::Error("TSimpleAnalysis::HandlefExpressionConfig",
-              "Missing '=' in %s:%d",fInputName.c_str(), numbLine);
-      throw std::runtime_error("Error");
-   }
-   std::size_t cutPos = line.find(kCutIntr, equal);
-   std::string substring=line.substr(0,equal);
-   if (substring.empty()) {
-      ::Error("TSimpleAnalysis::HandlefExpressionConfig",
-              "No hname found in %s:%d",fInputName.c_str(), numbLine);
-      throw std::runtime_error("Error");
-   }
-   DeleteSpaces(substring);
-   histNames.append(substring);
-   substring=line.substr(equal+1,cutPos-equal-1);
-   if (substring.empty()) {
-      ::Error("TSimpleAnalysis::HandlefExpressionConfig",
-              "No expression found in %s:%d",fInputName.c_str(), numbLine);
-      throw std::runtime_error("Error");
-   }
-   DeleteSpaces(substring);
-   histExpressions.append(substring);
-   if (cutPos == std::string::npos) {
-      histCut.append("");
-   } else {
-      histCut.append(line.substr(cutPos+kCutIntr.size()));
-   }
-
-    auto check =
-      fHists.insert(std::make_pair((const std::string&)histNames,
-                                   std::make_pair(histExpressions,histCut)));
-   if (check.second==false) {
-      ::Error("TSimpleAnalysis::HandleExpressionConfig",
-              "The histogram name '%s' is already existing", histNames.c_str());
-      throw std::runtime_error("Name of the histogram already existing");
-   }
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Skip subsequent empty lines in a string and returns the number of the
@@ -201,7 +149,7 @@ std::string TSimpleAnalysis::SkipSubsequentEmptyLines(int& numbLine)
    while (getline(fIn,notEmptyLine) && DeleteSpaces(notEmptyLine)
           && (notEmptyLine.empty() || notEmptyLine.find("#") == 0 ||
               notEmptyLine.find_first_not_of(" ") == std::string::npos))
-
+      {numbLine++;}
    numbLine++;
    return notEmptyLine;
 }
@@ -225,11 +173,11 @@ bool TSimpleAnalysis::HandleLines(std::string& line, int& readingSection, int& n
 
    DeleteSpaces(line);
    std::size_t comment = line.find("#");
-   if (comment==0)
+   if (comment == 0)
       return 1;
    if (((comment != 0) || (comment != std::string::npos)) && readingSection == 0)
       fCounter++;
-   line = line.substr(0,comment);
+   line = line.substr(0, comment);
    DeleteSpaces(line);
    return 0;
 }
@@ -237,7 +185,7 @@ bool TSimpleAnalysis::HandleLines(std::string& line, int& readingSection, int& n
 ////////////////////////////////////////////////////////////////////////////////
 /// This function has the aim of setting the arguments read from the input file
 
-void TSimpleAnalysis::Configure()
+bool TSimpleAnalysis::Configure()
 {
    int readingSection = kReadingOutput;
    std::string line;
@@ -245,42 +193,48 @@ void TSimpleAnalysis::Configure()
 
    fIn.open(fInputName);
    if(!fIn) {
-      ::Error("TSimpleAnalysis","File %s not found",fInputName.c_str());
-      throw std::runtime_error("Error");
+      ::Error("TSimpleAnalysis", "File %s not found", fInputName.c_str());
+      return 0;
    }
 
    while(!fIn.eof()) {
+      std::string errMessage;
 
       getline (fIn,line);
       numbLine++;
-      if (HandleLines(line,readingSection,numbLine)==1)
+      if (HandleLines(line, readingSection, numbLine))
          continue;
 
-      switch (readingSection) {
-      case kReadingOutput:
-         fOutputFile = line;
-         break;
+         switch (readingSection) {
+         case kReadingOutput:
+            fOutputFile = line;
+            break;
 
-      case kReadingInput:
-         fInputFiles.push_back(line);
-         break;
+         case kReadingInput:
+            fInputFiles.push_back(line);
+            break;
 
-      case kReadingTreeName:
+         case kReadingTreeName:
+            if (HandleTreeNameConfig(line)) {
+               fTreeName = line;
+               readingSection = kReadingExpressions;
+            }
+            else
+               errMessage=HandleExpressionConfig(line);
+            break;
 
-         if (HandleTreeNameConfig(line) == true) {
-            fTreeName = line;
-            readingSection = kReadingExpressions;
+         case kReadingExpressions:
+            errMessage=HandleExpressionConfig(line);
+            break;
+
+         case kEndOfFile: break;
          }
-         else {
-            HandleExpressionConfig(line,numbLine);
+
+         if (!errMessage.empty()) {
+            ::Error("TSimpleAnalysis::Configure","%s in %s:%d", errMessage.c_str(),
+                    fInputName.c_str(), numbLine);
+            return false;
          }
-         break;
-
-      case kReadingExpressions:
-         HandleExpressionConfig(line,numbLine);
-         break;
-
-      case kEndOfFile: break;
-      }
    }
+   return true;
 }

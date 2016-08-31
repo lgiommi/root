@@ -81,8 +81,8 @@ private:
       kEndOfFile
    };
    static const std::string kCutIntr; ///< The string that represents the starter point of the cut expresson
-   int fCounter=0; ///< Counter usefull for the reading of the file
-   void HandleExpressionConfig(std::string& line, int& numbLine);
+   int fCounter = 0; ///< Counter usefull for the reading of the file
+   std::string HandleExpressionConfig(std::string& line);
    std::string SkipSubsequentEmptyLines(int& numbLine);
    bool HandleLines(std::string& line, int& readingSection, int& numbLine);
 
@@ -91,8 +91,8 @@ public:
    TSimpleAnalysis(const std::string& file);
    TSimpleAnalysis(const std::string& output, const std::vector<std::string>& inputFiles,
                    const std::string& name, std::vector<std::string> expressions);
-   bool Analysis();
-   void Configure();
+   bool Analyze();
+   bool Configure();
 
 };
 
