@@ -26,30 +26,32 @@
 // the configuration procedure.                                         //
 // Here an example of configuration file:                               //
 //                                                                      //
+// ```                                                                  //
 // #This is an example of configuration file                            //
 // file_output.root   #the output file in which are stored histograms   //
 // #the next line has to be an empty line                               //
 //                                                                      //
-// #The lines of the next block correspond to .root input files in which//
-// #are stored the Ntuple                                               //
+// #The lines of the next block correspond to .root input files that    //
+// #contain the tree                                                    //
 // hsimple1.root   #first .root input file                              //
 // hsimple2.root   #second .root input file                             //
 // #the next line has to be an empty line                               //
 //                                                                      //
-// #The next line has the name of the tree of the input data            //
+// #The next line has the name of the tree of the input data. It is     //
+// #optional if there is exactly one tree in the first file             //
 // ntuple   #name of the input tree                                     //
 // #The next block is composed by lines that allow to configure the     //
-// #histograms. They have to be the follow sintax:                      //
-// #hName=hExpr if hCut   #where:                                       //
-// #'hName' is the name of the histogram written in the output file     //
-// #'hExpr' is the expression reproduced in the histogram               //
-// #' if '  is the expression that tell us the begin of the optional    //
-// #        cut expression                                              //
-// #'hCut'  is the optional cut expression in the histogram             //
+// #histograms. They have to be the follow syntax:                      //
+// #name = expression if cut                                            //
+// #which corresponds to chain->Draw("expression >> name", "cut")       //
+// #i.e. it will create a histogram called name and store it in         //
+// #file_output.root.                                                   //
+// #"if cut" is optional                                                //
 // hpx=px if px<-3   #first histogram                                   //
 // hpxpy=px:py    #second histograms                                    //
 //                                                                      //
 // #End of the configuration file                                       //
+// ```                                                                  //
 //                                                                      //
 //////////////////////////////////////////////////////////////////////////
 
@@ -80,22 +82,24 @@ private:
       kReadingExpressions,
       kEndOfFile
    };
-   static const std::string kCutIntr; ///< The string that represents the starter point of the cut expresson
-   int fCounter = 0; ///< Counter usefull for the reading of the file
-   std::string HandleExpressionConfig(std::string& line);
-   std::string SkipSubsequentEmptyLines(int& numbLine);
-   bool HandleLines(std::string& line, int& readingSection, int& numbLine);
+
+   std::string HandleExpressionConfig(const std::string& line);
+   std::string GetNextNonEmptyLine(int& numbLine);
+   std::string ExtractTreeName();
+   void GetLine(std::string& line);
+   bool HandleTreeNameConfig(const std::string& line);
+
 
 
 public:
-   TSimpleAnalysis(const std::string& file);
+   TSimpleAnalysis(const std::string& file): fInputName (file) {}
    TSimpleAnalysis(const std::string& output, const std::vector<std::string>& inputFiles,
-                   const std::string& name, std::vector<std::string> expressions);
+                   const std::vector<std::string>& expressions, const std::string& treeName);
    bool Analyze();
    bool Configure();
 
 };
 
-bool RunSimpleAnalysis(const char* input);
+bool RunSimpleAnalysis(const char* configurationFile);
 
 #endif

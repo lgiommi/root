@@ -11,175 +11,219 @@
 
 #include "TSimpleAnalysis.h"
 
+#include "TFile.h"
+#include "TChain.h"
+#include "TH1.h"
+#include "TError.h"
+#include "TKey.h"
+
 #include <string>
 #include <fstream>
 #include <vector>
 #include <map>
 
-#include "TFile.h"
-#include "TChain.h"
-#include "TH1.h"
-#include "TError.h"
-
-/** \class TSympleAnalysis
+/** \class TSimpleAnalysis
 A TSimpleAnalysis object permit to, given an input file,
 create an .root file in which are saved histograms
 that the user wants to create.
 */
 
-const std::string TSimpleAnalysis::kCutIntr="if";
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Delete white spaces in a string
+/// Deletes leading and trailing white spaces in a string
 ///
 /// param[in] line line read from the input file
 
-static bool DeleteSpaces(std::string& line)
+static void DeleteSpaces(std::string& line)
 {
-   std::size_t firstNotSpace = line.find_first_not_of(" ");
+   std::size_t firstNotSpace = line.find_first_not_of(" \t");
    if (firstNotSpace != std::string::npos)
       line = line.substr(firstNotSpace, line.size()-firstNotSpace);
-   std::size_t lastNotSpace = line.find_last_not_of(" ");
+   else
+      line.clear();
+   std::size_t lastNotSpace = line.find_last_not_of(" \t");
    if (lastNotSpace != std::string::npos)
       line = line.substr(0, lastNotSpace+1);
-   return 1;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// It handles the expression lines of the input file in order to pass the
 /// elements to the members of the object
 ///
-/// param[in] line line read from the input file or the expression passed to the constructor
+/// param[in] line line or read from the input file either the expression passed to the constructor
 
-std::string TSimpleAnalysis::HandleExpressionConfig(std::string& line)
+std::string TSimpleAnalysis::HandleExpressionConfig(const std::string& line)
 {
+   static const std::string kCutIntr = " if ";
+
    std::size_t equal = line.find("=");
    if (equal == std::string::npos)
       return "Error: missing '='";
    std::size_t cutPos = line.find(kCutIntr, equal);
    std::string histName = line.substr(0, equal);
+   DeleteSpaces(histName);
    if (histName.empty())
       return "Error: no histName found";
-   DeleteSpaces(histName);
 
-   std::string histExpression = line.substr(equal+1, cutPos-equal-1);
+   std::string histExpression = line.substr(equal + 1, cutPos - equal - 1);
+   DeleteSpaces(histExpression);
    if (histExpression.empty())
       return "Error: no expression found";
-   DeleteSpaces(histExpression);
 
    std::string histCut;
-   if (cutPos != std::string::npos)
-      histCut = line.substr(cutPos+kCutIntr.size());
+   if (cutPos != std::string::npos) {
+      histCut = line.substr(cutPos + kCutIntr.size());
+      DeleteSpaces(histCut);
+      if (histCut.empty())
+         return "Error: invalid syntax";
+   }
+   else
+      histCut = "";
 
    auto check = fHists.insert(std::make_pair((const std::string&)histName,
                                              std::make_pair(histExpression, histCut)));
    if (!check.second)
-      return "Name of the histogram already existing";
+      return "Duplicate histogram name";
    return "";
 }
-
-////////////////////////////////////////////////////////////////////////////////
-/// Constructor for the case with the input file
-///
-/// \param[in] kFile name of the input file that has to be read
-
-TSimpleAnalysis::TSimpleAnalysis(const std::string& file): fInputName(file)
-{}
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Constructor for the case of command line parsing arguments
 ///
 /// \param[in] output name of the output file
 /// \param[in] inputFiles name of the input .root files
-/// \param[in] name name of the tree
 /// \param[in] expressions what is showed in the histograms
+/// \param[in] treeName name of the tree
+/// \throws std::runtime_error in case of ill-formed expressions
 
-TSimpleAnalysis::TSimpleAnalysis(const std::string& output, const std::vector<std::string>& inputFiles,
-                                 const std::string& name, std::vector<std::string> expressions):
-   fInputFiles(inputFiles), fOutputFile(output), fTreeName(name)
+TSimpleAnalysis::TSimpleAnalysis(const std::string& output,
+                                 const std::vector<std::string>& inputFiles,
+                                 const std::vector<std::string>& expressions,
+                                 const std::string& treeName = ""):
+   fInputFiles(inputFiles), fOutputFile(output), fTreeName(treeName)
 {
-      for (std::string expr: expressions) {
-        std::string errMessage = HandleExpressionConfig(expr);
-         if (!errMessage.empty())
-            throw std::runtime_error(errMessage + " in " +  expr);
-      }
+   for (const std::string& expr: expressions) {
+      std::string errMessage = HandleExpressionConfig(expr);
+      if (!errMessage.empty())
+         throw std::runtime_error(errMessage + " in " +  expr);
+   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Return true if the input arguments create the output file correctly
+/// Needs to extract the name of the tree from the first input file when the tree
+/// name isn't in the configuration file. Returns the name of the tree.
+
+std::string TSimpleAnalysis::ExtractTreeName()
+{
+   std::string treeName = "";
+   TFile inputFile (fInputFiles[0].c_str());
+   for (TObject* keyAsObj : *inputFile.GetListOfKeys()) {
+      TKey* key = dynamic_cast<TKey*>(keyAsObj);
+      TClass* clObj = TClass::GetClass(key->GetClassName());
+      if (!clObj)
+         continue;
+      if (clObj->InheritsFrom(TTree::Class())) {
+         if (treeName.empty())
+            treeName = key->GetName();
+         else {
+            ::Error("TSimpleAnalysis::Analyze","Multiple trees inside %s",fInputFiles[0].c_str());
+            return "";
+         }
+      }
+   }
+   if (treeName.empty()) {
+      ::Error("TSimpleAnalysis::Analyze","No tree inside %s",fInputFiles[0].c_str());
+      return "";
+   }
+   return treeName;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+/// Executes all the TChain::Draw() as configured and stores the output histograms.
+/// Returns true if the input arguments create correctly the output file
 
 bool TSimpleAnalysis::Analyze()
 {
+   if (fTreeName.empty())
+      fTreeName = ExtractTreeName();
    TChain chain(fTreeName.c_str());
    for (const std::string& inputfile: fInputFiles)
       chain.Add(inputfile.c_str());
+   if (fInputFiles[0].find("=") != std::string::npos) {
+      ::Error("TSimpleAnalysis::Analyze", "%s is an expression, not an input file",
+              fInputFiles[0].c_str());
+      return false;
+   }
+   int errValue = chain.LoadTree(0);
+   if (errValue < 0) {
+      ::Error("TSimpleAnalysis::Analyze",
+              "The chain is not correctly set up, chain.LoadTree(0) returns %d", errValue);
+      return false;
+   }
    TFile ofile(fOutputFile.c_str(), "RECREATE");
 
    for (const auto &histo : fHists) {
       chain.Draw((histo.second.first + ">>" + histo.first).c_str(), histo.second.second.c_str(), "goff");
       TH1F *ptrHisto = (TH1F*)gDirectory->Get(histo.first.c_str());
-      ptrHisto->Write();
-      if (ptrHisto == nullptr)
+      if (!ptrHisto)
          return false;
+      ptrHisto->Write();
    }
    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Return false if not a tree name
+/// Returns false if not a tree name, otherwise sets the name of the tree.
 ///
 /// param[in] line line read from the input file
 
-static bool HandleTreeNameConfig(const std::string& line)
+bool TSimpleAnalysis::HandleTreeNameConfig(const std::string& line)
 {
-   return line.find("=") == std::string::npos;
+   if (line.find("=") == std::string::npos) {
+      fTreeName = line;
+      return true;
+   }
+   return false;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+/// Gets the next line from the configuration file and deletes leading and trailing spaces
+
+void TSimpleAnalysis::GetLine(std::string& line)
+{
+   getline(fIn, line);
+   DeleteSpaces(line);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Skip subsequent empty lines in a string and returns the number of the
-/// current line of the input file
+/// Skips subsequent empty lines in a string and returns the next no empty line
 ///
 /// param[in] numbLine number of the input file line
 
-std::string TSimpleAnalysis::SkipSubsequentEmptyLines(int& numbLine)
+std::string TSimpleAnalysis::GetNextNonEmptyLine(int& numbLine)
 {
    std::string notEmptyLine;
 
-   while (getline(fIn,notEmptyLine) && DeleteSpaces(notEmptyLine)
-          && (notEmptyLine.empty() || notEmptyLine.find("#") == 0 ||
-              notEmptyLine.find_first_not_of(" ") == std::string::npos))
-      {numbLine++;}
+   do {
+      GetLine(notEmptyLine);
+      numbLine++;
+   } while (fIn && (notEmptyLine.empty() || notEmptyLine[0] == '#'));
+
    numbLine++;
+   DeleteSpaces(notEmptyLine);
    return notEmptyLine;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// After the eventual skip of subsequent empty lines, returns true if the
-/// line is a comment
+/// Removes everything after '#' and then removes leading and trailing spaces
 ///
 /// param[in] line line read from the input file
-/// param[in] readingSection current section of the read file
-/// param[in] numbLine number of the input file line
 
-bool TSimpleAnalysis::HandleLines(std::string& line, int& readingSection, int& numbLine)
+static void RemoveComment(std::string& line)
 {
-   if (line.empty() || line.find_first_not_of(" ") == std::string::npos) {
-      if (readingSection == 0 && fCounter == 0)
-         return 1;
-      readingSection++;
-      line = SkipSubsequentEmptyLines(numbLine);
-   }
-
-   DeleteSpaces(line);
-   std::size_t comment = line.find("#");
-   if (comment == 0)
-      return 1;
-   if (((comment != 0) || (comment != std::string::npos)) && readingSection == 0)
-      fCounter++;
+   std::size_t comment = line.find('#');
    line = line.substr(0, comment);
    DeleteSpaces(line);
-   return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -192,17 +236,25 @@ bool TSimpleAnalysis::Configure()
    int numbLine = 0;
 
    fIn.open(fInputName);
-   if(!fIn) {
+   if (!fIn) {
       ::Error("TSimpleAnalysis", "File %s not found", fInputName.c_str());
       return 0;
    }
 
-   while(!fIn.eof()) {
+   while (!fIn.eof()) {
       std::string errMessage;
 
-      getline (fIn,line);
+      GetLine(line);
       numbLine++;
-      if (HandleLines(line, readingSection, numbLine))
+
+      if (line.empty()) {
+         if (!fOutputFile.empty())
+            readingSection++;
+         line = GetNextNonEmptyLine(numbLine);
+      }
+
+      RemoveComment(line);
+      if (line.empty())
          continue;
 
          switch (readingSection) {
@@ -215,16 +267,13 @@ bool TSimpleAnalysis::Configure()
             break;
 
          case kReadingTreeName:
-            if (HandleTreeNameConfig(line)) {
-               fTreeName = line;
-               readingSection = kReadingExpressions;
-            }
-            else
-               errMessage=HandleExpressionConfig(line);
+            if (!HandleTreeNameConfig(line))
+               errMessage = HandleExpressionConfig(line);
+            readingSection = kReadingExpressions;
             break;
 
          case kReadingExpressions:
-            errMessage=HandleExpressionConfig(line);
+            errMessage = HandleExpressionConfig(line);
             break;
 
          case kEndOfFile: break;
@@ -245,8 +294,9 @@ bool TSimpleAnalysis::Configure()
 ///
 /// param[in] input name of the input file used to create the TSimpleAnalysis object
 
-bool RunSimpleAnalysis (const char* input) {
-   TSimpleAnalysis obj(input);
+bool RunSimpleAnalysis (const char* configurationFile) {
+   TSimpleAnalysis obj(configurationFile);
    obj.Configure();
    obj.Analyze();
+   return true;
 }
