@@ -176,11 +176,14 @@ bool TSimpleAnalysis::Analyze()
 {
    // Disambiguate tree name from first input file:
    // just try to open it, if that works it's an input file.
+   int oldLevel = gErrorIgnoreLevel;
+   gErrorIgnoreLevel = kFatal;
    if (TFile::Open(fTreeName.c_str())) {
       fInputFiles.insert(fInputFiles.begin(), fTreeName);
       fTreeName.clear();
       fTreeName = ExtractTreeName();
    }
+   gErrorIgnoreLevel = oldLevel;
    // Do the chain of the fInputFiles
    TChain chain(fTreeName.c_str());
    for (const std::string& inputfile: fInputFiles)
