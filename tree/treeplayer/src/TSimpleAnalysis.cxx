@@ -21,13 +21,43 @@
 #include <fstream>
 #include <vector>
 #include <map>
+#include <iostream>
 
 /** \class TSimpleAnalysis
-A TSimpleAnalysis object permit to, given an input file,
-create an .root file in which are saved histograms
-that the user wants to create.
-*/
+A TSimpleAnalysis object permit to, given an input file, create a
+.root file in which are saved histograms that the user wants to
+create. The configuration file needs to set the parameters that allow
+to create the histograms. This file has a fixed sintax, in which are
+allowed comments (marked with the '#' sign) at the beginning of the
+line (less than whitespaces), or at the end of the configuration
+line. Empty or comment lines are skipped from the configuration procedure.
+Here an example of configuration file:
+```
+#This is an example of configuration file
+file_output.root   #the output file in which are stored histograms
 
+#The next line has the name of the tree of the input data. It is
+#optional if there is exactly one tree in the first input file
+ntuple   #name of the input tree
+
+#The lines of the next block correspond to .root input files that
+#contain the tree
+hsimple1.root   #first .root input file
+hsimple2.root   #second .root input file
+
+#The next block is composed by lines that allow to configure the
+#histograms. They have to be the follow syntax:
+#name = expression if cut
+#which corresponds to chain->Draw("expression >> name", "cut")
+#i.e. it will create a histogram called name and store it in
+#file_output.root.
+#"if cut" is optional
+hpx=px if px<-3   #first histogram
+hpxpy=px:py    #second histograms
+
+#End of the configuration file
+```
+*/
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Deletes leading and trailing white spaces in a string
@@ -38,12 +68,12 @@ static void DeleteSpaces(std::string& line)
 {
    std::size_t firstNotSpace = line.find_first_not_of(" \t");
    if (firstNotSpace != std::string::npos)
-      line = line.substr(firstNotSpace, line.size()-firstNotSpace);
+      line = line.substr(firstNotSpace, line.size() - firstNotSpace);
    else
       line.clear();
    std::size_t lastNotSpace = line.find_last_not_of(" \t");
    if (lastNotSpace != std::string::npos)
-      line = line.substr(0, lastNotSpace+1);
+      line = line.substr(0, lastNotSpace + 1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -126,13 +156,13 @@ std::string TSimpleAnalysis::ExtractTreeName()
          if (treeName.empty())
             treeName = key->GetName();
          else {
-            ::Error("TSimpleAnalysis::Analyze","Multiple trees inside %s",fInputFiles[0].c_str());
+            ::Error("TSimpleAnalysis::Analyze", "Multiple trees inside %s", fInputFiles[0].c_str());
             return "";
          }
       }
    }
    if (treeName.empty()) {
-      ::Error("TSimpleAnalysis::Analyze","No tree inside %s",fInputFiles[0].c_str());
+      ::Error("TSimpleAnalysis::Analyze", "No tree inside %s", fInputFiles[0].c_str());
       return "";
    }
    return treeName;
@@ -144,8 +174,14 @@ std::string TSimpleAnalysis::ExtractTreeName()
 
 bool TSimpleAnalysis::Analyze()
 {
-   if (fTreeName.empty())
+   // Disambiguate tree name from first input file:
+   // just try to open it, if that works it's an input file.
+   if (TFile::Open(fTreeName.c_str())) {
+      fInputFiles.insert(fInputFiles.begin(), fTreeName);
+      fTreeName.clear();
       fTreeName = ExtractTreeName();
+   }
+   // Do the chain of the fInputFiles
    TChain chain(fTreeName.c_str());
    for (const std::string& inputfile: fInputFiles)
       chain.Add(inputfile.c_str());
@@ -177,17 +213,32 @@ bool TSimpleAnalysis::Analyze()
 ///
 /// param[in] line line read from the input file
 
-bool TSimpleAnalysis::HandleTreeNameConfig(const std::string& line)
+bool TSimpleAnalysis::HandleInputConfig(const std::string& line)
 {
    if (line.find("=") == std::string::npos) {
-      fTreeName = line;
+      fInputFiles.push_back(line);
       return true;
    }
    return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// Removes everything after '#' and then removes leading and trailing spaces
+///
+/// param[in] line line read from the input file
+
+static void RemoveComment(std::string& line)
+{
+   std::size_t comment = line.find('#');
+   line = line.substr(0, comment);
+   DeleteSpaces(line);
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 /// Gets the next line from the configuration file and deletes leading and trailing spaces
+///
+/// param[in] line line read from the input file
 
 void TSimpleAnalysis::GetLine(std::string& line)
 {
@@ -209,21 +260,24 @@ std::string TSimpleAnalysis::GetNextNonEmptyLine(int& numbLine)
       numbLine++;
    } while (fIn && (notEmptyLine.empty() || notEmptyLine[0] == '#'));
 
-   numbLine++;
    DeleteSpaces(notEmptyLine);
    return notEmptyLine;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Removes everything after '#' and then removes leading and trailing spaces
+/// Gets lines from the configuration files up to the first no empty line and then
+/// it removes comments
 ///
 /// param[in] line line read from the input file
+/// param[in] numbLine number of the input file line
 
-static void RemoveComment(std::string& line)
+void TSimpleAnalysis::GetLineForConfigure(std::string& line, int& numbLine)
 {
-   std::size_t comment = line.find('#');
-   line = line.substr(0, comment);
-   DeleteSpaces(line);
+   GetLine(line);
+   numbLine++;
+   if (line.empty())
+      line = GetNextNonEmptyLine(numbLine);
+   RemoveComment(line);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -244,32 +298,27 @@ bool TSimpleAnalysis::Configure()
    while (!fIn.eof()) {
       std::string errMessage;
 
-      GetLine(line);
-      numbLine++;
+      GetLineForConfigure(line, numbLine);
 
-      if (line.empty()) {
-         if (!fOutputFile.empty())
-            readingSection++;
-         line = GetNextNonEmptyLine(numbLine);
-      }
-
-      RemoveComment(line);
       if (line.empty())
          continue;
 
          switch (readingSection) {
          case kReadingOutput:
             fOutputFile = line;
-            break;
-
-         case kReadingInput:
-            fInputFiles.push_back(line);
+            readingSection++;
             break;
 
          case kReadingTreeName:
-            if (!HandleTreeNameConfig(line))
+            fTreeName = line;
+            readingSection++;
+            break;
+
+         case kReadingInput:
+            if (!HandleInputConfig(line)) {
                errMessage = HandleExpressionConfig(line);
-            readingSection = kReadingExpressions;
+               readingSection = kReadingExpressions;
+            }
             break;
 
          case kReadingExpressions:
@@ -280,7 +329,7 @@ bool TSimpleAnalysis::Configure()
          }
 
          if (!errMessage.empty()) {
-            ::Error("TSimpleAnalysis::Configure","%s in %s:%d", errMessage.c_str(),
+            ::Error("TSimpleAnalysis::Configure", "%s in %s:%d", errMessage.c_str(),
                     fInputName.c_str(), numbLine);
             return false;
          }

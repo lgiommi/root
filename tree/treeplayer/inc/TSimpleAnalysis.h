@@ -12,49 +12,11 @@
 #ifndef ROOT_TSimpleAnalysis
 #define ROOT_TSimpleAnalysis
 
-//////////////////////////////////////////////////////////////////////////
-//                                                                      //
-// TSimpleAnalysis                                                      //
-//                                                                      //
-// A TSimpleAnalysis object permit to, given an input file, create a    //
-// .root file in which are saved histograms that the user wants to      //
-// create. The configuration file needs to set the parameters that allow//
-// to create the histograms. This file has a fixed sintax, in which are //
-// allowed comments (marked with the '#' sign) at the beginning of the  //
-// line (less than whitespaces), or at the end of the configuration     //
-// line. Subsequently empty or comment lines or both are skipped from   //
-// the configuration procedure.                                         //
-// Here an example of configuration file:                               //
-//                                                                      //
-// ```                                                                  //
-// #This is an example of configuration file                            //
-// file_output.root   #the output file in which are stored histograms   //
-// #the next line has to be an empty line                               //
-//                                                                      //
-// #The lines of the next block correspond to .root input files that    //
-// #contain the tree                                                    //
-// hsimple1.root   #first .root input file                              //
-// hsimple2.root   #second .root input file                             //
-// #the next line has to be an empty line                               //
-//                                                                      //
-// #The next line has the name of the tree of the input data. It is     //
-// #optional if there is exactly one tree in the first file             //
-// ntuple   #name of the input tree                                     //
-// #The next block is composed by lines that allow to configure the     //
-// #histograms. They have to be the follow syntax:                      //
-// #name = expression if cut                                            //
-// #which corresponds to chain->Draw("expression >> name", "cut")       //
-// #i.e. it will create a histogram called name and store it in         //
-// #file_output.root.                                                   //
-// #"if cut" is optional                                                //
-// hpx=px if px<-3   #first histogram                                   //
-// hpxpy=px:py    #second histograms                                    //
-//                                                                      //
-// #End of the configuration file                                       //
-// ```                                                                  //
-//                                                                      //
-//////////////////////////////////////////////////////////////////////////
-
+/** \class TSimpleAnalysis
+A TSimpleAnalysis object permit to, given an input file,
+create an .root file in which are saved histograms
+that the user wants to create.
+*/
 
 #include <string>
 #include <fstream>
@@ -77,8 +39,8 @@ private:
    //that are in the input file
    enum EReadingWhat {
       kReadingOutput,
-      kReadingInput,
       kReadingTreeName,
+      kReadingInput,
       kReadingExpressions,
       kEndOfFile
    };
@@ -87,8 +49,8 @@ private:
    std::string GetNextNonEmptyLine(int& numbLine);
    std::string ExtractTreeName();
    void GetLine(std::string& line);
-   bool HandleTreeNameConfig(const std::string& line);
-
+   bool HandleInputConfig(const std::string& line);
+   void GetLineForConfigure(std::string& line, int& numbLine);
 
 
 public:
