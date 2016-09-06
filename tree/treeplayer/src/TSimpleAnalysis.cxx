@@ -24,54 +24,57 @@
 #include <iostream>
 
 /** \class TSimpleAnalysis
-A TSimpleAnalysis object allow to, given an input file, create a
-.root file in which are saved histograms that the user wants to
-create. The configuration file needs to set the parameters that allow
-to create the histograms. This file has a fixed sintax, in which are
-allowed comments (marked with the '#' sign) at the beginning of the
-line (less than whitespaces), or at the end of the configuration
-line. Empty or comment lines are skipped from the configuration procedure.
+
+A TSimpleAnalysis object creates histograms from a TChain. These histograms
+are stored to an output file. The histogrammed (TTreeFormula) expressions,
+their cuts, the input and output files are configured through a simple config
+file that allows comments starting with '#'.
 Here an example of configuration file:
 ```
-#This is an example of configuration file
-file_output.root   #the output file in which are stored histograms
+# This is an example of configuration file
+file_output.root   #the output file in which histograms are stored
 
-#The next line has the name of the tree of the input data. It is
-#optional if there is exactly one tree in the first input file
+# The next line has the name of the tree of the input data. It is
+# optional if there is exactly one tree in the first input file.
 ntuple   #name of the input tree
 
-#The lines of the next block correspond to .root input files that
-#contain the tree
+# The lines of the next block correspond to .root input files that
+# contain the tree
 hsimple1.root   #first .root input file
 hsimple2.root   #second .root input file
 
-#The next block is composed by lines that allow to configure the
-#histograms. They have to be the follow syntax:
-#name = expression if cut
-#which corresponds to chain->Draw("expression >> name", "cut")
-#i.e. it will create a histogram called name and store it in
-#file_output.root.
-#"if cut" is optional
+# The next block is composed by lines that allow to configure the
+# histograms. They have the following syntax:
+# NAME = EXPRESSION if CUT
+# which corresponds to chain->Draw("EXPRESSION >> NAME", "CUT")
+# i.e. it will create a histogram called NAME and store it in
+# file_output.root.
+# "if CUT" is optional
 hpx=px if px<-3   #first histogram
 hpxpy=px:py    #second histogram
 
-#End of the configuration file
+# End of the configuration file
 ```
 */
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Delete leading and trailing white spaces in a string.
+/// Delete comments, leading and trailing white spaces in a string.
 ///
-/// param[in] line line read from the input file
+/// param[in] line - line read from the input file
 
-static void DeleteSpaces(std::string& line)
+static void DeleteCommentsAndSpaces(std::string& line)
 {
+   // Delete comments
+   std::size_t comment = line.find('#');
+   line = line.substr(0, comment);
    // Delete leading spaces
    std::size_t firstNotSpace = line.find_first_not_of(" \t");
    if (firstNotSpace != std::string::npos)
-      line = line.substr(firstNotSpace, line.size() - firstNotSpace);
-   else
+      line = line.substr(firstNotSpace);
+   else {
       line.clear();
+      return;
+   }
    // Delete trailing spaces
    std::size_t lastNotSpace = line.find_last_not_of(" \t");
    if (lastNotSpace != std::string::npos)
@@ -82,7 +85,8 @@ static void DeleteSpaces(std::string& line)
 /// Handle the expression lines of the input file in order to pass the
 /// elements to the members of the object.
 ///
-/// param[in] line line or read from the input file either the expression passed to the constructor
+/// param[in] line - TTreeFormula expression, either read form the configuration
+///                  file or passed as expression to the constructor
 
 std::string TSimpleAnalysis::HandleExpressionConfig(const std::string& line)
 {
@@ -94,14 +98,18 @@ std::string TSimpleAnalysis::HandleExpressionConfig(const std::string& line)
 
    // Set the histName value
    std::string histName = line.substr(0, equal);
-   DeleteSpaces(histName);
+   DeleteCommentsAndSpaces(histName);
    if (histName.empty())
       return "Error: no histName found";
 
    //Set the histExpression value
    std::size_t cutPos = line.find(kCutIntr, equal);
-   std::string histExpression = line.substr(equal + 1, cutPos - equal - 1);
-   DeleteSpaces(histExpression);
+   std::string histExpression;
+   if (cutPos == std::string::npos)
+      histExpression = line.substr(equal + 1);
+   else
+      histExpression = line.substr(equal + 1, cutPos - equal - 1);
+   DeleteCommentsAndSpaces(histExpression);
    if (histExpression.empty())
       return "Error: no expression found";
 
@@ -109,9 +117,9 @@ std::string TSimpleAnalysis::HandleExpressionConfig(const std::string& line)
    std::string histCut;
    if (cutPos != std::string::npos) {
       histCut = line.substr(cutPos + kCutIntr.size());
-      DeleteSpaces(histCut);
+      DeleteCommentsAndSpaces(histCut);
       if (histCut.empty())
-         return "Error: invalid syntax";
+         return "Error: missing cut expression after 'if'";
    }
    else
       histCut = "";
@@ -130,10 +138,10 @@ std::string TSimpleAnalysis::HandleExpressionConfig(const std::string& line)
 /// Constructor for the case of command line parsing arguments. It sets the members
 /// of the object.
 ///
-/// \param[in] output name of the output file
-/// \param[in] inputFiles name of the input .root files
-/// \param[in] expressions what is showed in the histograms
-/// \param[in] treeName name of the tree
+/// \param[in] output - name of the output file
+/// \param[in] inputFiles - name of the input .root files
+/// \param[in] expressions - what is shown in the histograms
+/// \param[in] treeName - name of the tree
 /// \throws std::runtime_error in case of ill-formed expressions
 
 TSimpleAnalysis::TSimpleAnalysis(const std::string& output,
@@ -153,10 +161,10 @@ TSimpleAnalysis::TSimpleAnalysis(const std::string& output,
 /// Extract the name of the tree from the first input file when the tree name
 /// isn't in the configuration file. Returns the name of the tree.
 
-std::string TSimpleAnalysis::ExtractTreeName()
+static std::string ExtractTreeName(std::string& firstInputFile)
 {
    std::string treeName = "";
-   TFile inputFile (fInputFiles[0].c_str());
+   TFile inputFile (firstInputFile.c_str());
 
    // Loop over all the keys inside the first input file
    for (TObject* keyAsObj : *inputFile.GetListOfKeys()) {
@@ -171,14 +179,14 @@ std::string TSimpleAnalysis::ExtractTreeName()
          if (treeName.empty())
             treeName = key->GetName();
          else {
-            ::Error("TSimpleAnalysis::Analyze", "Multiple trees inside %s", fInputFiles[0].c_str());
+            ::Error("TSimpleAnalysis::Analyze", "Multiple trees inside %s", firstInputFile.c_str());
             return "";
          }
       }
    }
    // If treeName is yet empty, error occours
    if (treeName.empty()) {
-      ::Error("TSimpleAnalysis::Analyze", "No tree inside %s", fInputFiles[0].c_str());
+      ::Error("TSimpleAnalysis::Analyze", "No tree inside %s", firstInputFile.c_str());
       return "";
    }
    return treeName;
@@ -186,18 +194,21 @@ std::string TSimpleAnalysis::ExtractTreeName()
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Execute all the TChain::Draw() as configured and stores the output histograms.
-/// Returns true if the input arguments create correctly the output file.
+/// Returns true if the analysis succeeds.
 
 bool TSimpleAnalysis::Analyze()
 {
-   // Disambiguate tree name from first input file:
-   // just try to open it, if that works it's an input file.
+   // Silence possible error message from TFile constructor if this is a tree name.
    int oldLevel = gErrorIgnoreLevel;
    gErrorIgnoreLevel = kFatal;
+   // Disambiguate tree name from first input file:
+   // just try to open it, if that works it's an input file.
    if (TFile::Open(fTreeName.c_str())) {
       fInputFiles.insert(fInputFiles.begin(), fTreeName);
       fTreeName.clear();
-      fTreeName = ExtractTreeName();
+      fTreeName = ExtractTreeName(fInputFiles[0]);
+      if (fTreeName.empty())
+         return false;
    }
    gErrorIgnoreLevel = oldLevel;
 
@@ -206,13 +217,7 @@ bool TSimpleAnalysis::Analyze()
    for (const std::string& inputfile: fInputFiles)
       chain.Add(inputfile.c_str());
 
-   if (fInputFiles[0].find("=") != std::string::npos) {
-      ::Error("TSimpleAnalysis::Analyze", "%s is an expression, not an input file",
-              fInputFiles[0].c_str());
-      return false;
-   }
-
-   // If the chain does not load correctly the tree in the first input file, error occours
+   // Sanity check that we can open the first file
    int errValue = chain.LoadTree(0);
    if (errValue < 0) {
       ::Error("TSimpleAnalysis::Analyze",
@@ -221,11 +226,18 @@ bool TSimpleAnalysis::Analyze()
    }
 
    TFile ofile(fOutputFile.c_str(), "RECREATE");
+   if (ofile.IsZombie()) {
+      ::Error("TSimpleAnalysis::Analyze", "Impossible to create %s", fOutputFile.c_str());
+      return false;
+   }
 
    // Save the histograms into the output file
    for (const auto &histo : fHists) {
-      chain.Draw((histo.second.first + ">>" + histo.first).c_str(), histo.second.second.c_str(), "goff");
-      TH1F *ptrHisto = (TH1F*)gDirectory->Get(histo.first.c_str());
+      const std::string& expr = histo.second.first;
+      const std::string& histoName = histo.first;
+      const std::string& cut = histo.second.second;
+      chain.Draw((expr + ">>" + histoName).c_str(), cut.c_str(), "goff");
+      TH1F *ptrHisto = (TH1F*)gDirectory->Get(histoName.c_str());
       if (!ptrHisto)
          return false;
       ptrHisto->Write();
@@ -236,73 +248,33 @@ bool TSimpleAnalysis::Analyze()
 ////////////////////////////////////////////////////////////////////////////////
 /// Returns false if not a tree name, otherwise sets the name of the tree.
 ///
-/// param[in] line line read from the input file
+/// param[in] line - line read from the input file
 
-bool TSimpleAnalysis::HandleInputConfig(const std::string& line)
+bool TSimpleAnalysis::HandleInputFileNameConfig(const std::string& line)
 {
    if (line.find("=") == std::string::npos) {
       fInputFiles.push_back(line);
       return true;
    }
-   return false;
+   return false;  // It's an expression
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Removes everything after '#' and then removes leading and trailing spaces.
-///
-/// param[in] line line read from the input file
-
-static void RemoveComment(std::string& line)
-{
-   std::size_t comment = line.find('#');
-   line = line.substr(0, comment);
-   DeleteSpaces(line);
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
-/// Gets the next line from the configuration file and deletes leading and trailing spaces.
-///
-/// param[in] line line read from the input file
-
-void TSimpleAnalysis::GetLine(std::string& line)
-{
-   getline(fIn, line);
-   DeleteSpaces(line);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Skips subsequent empty lines in a string and returns the next not empty line.
+/// Skips subsequent empty lines read from fIn and returns the next not empty line.
 ///
 /// param[in] numbLine number of the input file line
 
-std::string TSimpleAnalysis::GetNextNonEmptyLine(int& numbLine)
+std::string TSimpleAnalysis::GetLine(int& numbLine)
 {
    std::string notEmptyLine;
 
    do {
-      GetLine(notEmptyLine);
+      getline(fIn, notEmptyLine);
+      DeleteCommentsAndSpaces(notEmptyLine);
       numbLine++;
-   } while (fIn && (notEmptyLine.empty() || notEmptyLine[0] == '#'));
+   } while (fIn && notEmptyLine.empty());
 
-   DeleteSpaces(notEmptyLine);
    return notEmptyLine;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Gets lines from the configuration files up to the first not empty line and then
-/// it removes comments.
-///
-/// param[in] line line read from the input file
-/// param[in] numbLine number of the input file line
-
-void TSimpleAnalysis::GetLineForConfigure(std::string& line, int& numbLine)
-{
-   GetLine(line);
-   numbLine++;
-   if (line.empty())
-      line = GetNextNonEmptyLine(numbLine);
-   RemoveComment(line);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -318,55 +290,51 @@ bool TSimpleAnalysis::Configure()
    fIn.open(fInputName);
    if (!fIn) {
       ::Error("TSimpleAnalysis", "File %s not found", fInputName.c_str());
-      return 0;
+      return false;
    }
 
    while (!fIn.eof()) {
+      line = GetLine(numbLine);
+      if (line.empty())  // It can happen if fIn.eof()
+         continue;
       std::string errMessage;
 
-      GetLineForConfigure(line, numbLine);
-      // Here the line is or empty either a configuration line
+      switch (readingSection) {
 
-      if (line.empty())
-         continue;
+         // Set the name of the output file
+      case kReadingOutput:
+         fOutputFile = line;
+         readingSection++;
+         break;
 
-         switch (readingSection) {
+         // Set the name of the tree
+      case kReadingTreeName:
+         fTreeName = line;
+         readingSection++;
+         break;
 
-            // Set the name of the output file
-         case kReadingOutput:
-            fOutputFile = line;
-            readingSection++;
-            break;
-
-            // Set the name of the tree
-         case kReadingTreeName:
-            fTreeName = line;
-            readingSection++;
-            break;
-
-            // Set the input files
-         case kReadingInput:
-            if (!HandleInputConfig(line)) {
-               errMessage = HandleExpressionConfig(line);
-               readingSection = kReadingExpressions;
-            }
-            break;
-
-            // Set the expressions
-         case kReadingExpressions:
+         // Set the input files
+      case kReadingInput:
+         if (!HandleInputFileNameConfig(line)) {
+            // Not an input file name; try to parse as an expression
             errMessage = HandleExpressionConfig(line);
-            break;
-
-         case kEndOfFile: break;
+            readingSection = kReadingExpressions;
          }
+         break;
 
-         // Report any errors if occour during the configuration proceedings
-         if (!errMessage.empty()) {
-            ::Error("TSimpleAnalysis::Configure", "%s in %s:%d", errMessage.c_str(),
-                    fInputName.c_str(), numbLine);
-            return false;
-         }
-   }
+         // Set the expressions
+      case kReadingExpressions:
+         errMessage = HandleExpressionConfig(line);
+         break;
+      }
+
+      // Report any errors if occour during the configuration proceedings
+      if (!errMessage.empty()) {
+         ::Error("TSimpleAnalysis::Configure", "%s in %s:%d", errMessage.c_str(),
+                 fInputName.c_str(), numbLine);
+         return false;
+      }
+   }  // while (!fIn.eof())
    return true;
 }
 
