@@ -60,7 +60,7 @@ public:
    TSimpleAnalysis(const std::string& file): fInputName (file) {}
    TSimpleAnalysis(const std::string& output, const std::vector<std::string>& inputFiles,
                    const std::vector<std::string>& expressions, const std::string& treeName);
-   bool Analyze();
+   bool Run();
    bool Configure();
 
 };

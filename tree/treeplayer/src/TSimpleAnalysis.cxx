@@ -196,7 +196,7 @@ static std::string ExtractTreeName(std::string& firstInputFile)
 /// Execute all the TChain::Draw() as configured and stores the output histograms.
 /// Returns true if the analysis succeeds.
 
-bool TSimpleAnalysis::Analyze()
+bool TSimpleAnalysis::Run()
 {
    // Silence possible error message from TFile constructor if this is a tree name.
    int oldLevel = gErrorIgnoreLevel;
@@ -260,7 +260,7 @@ bool TSimpleAnalysis::HandleInputFileNameConfig(const std::string& line)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Skips subsequent empty lines read from fIn and returns the next not empty line.
+/// Skip subsequent empty lines read from fIn and returns the next not empty line.
 ///
 /// param[in] numbLine number of the input file line
 
@@ -346,7 +346,9 @@ bool TSimpleAnalysis::Configure()
 
 bool RunSimpleAnalysis (const char* configurationFile) {
    TSimpleAnalysis obj(configurationFile);
-   obj.Configure();
-   obj.Analyze();
-   return true;
+   if (!obj.Configure())
+      return false;
+   if (!obj.Run())
+      return false;
+   return true;  // Return true only if Configure() and Run() functions were performed correctly
 }
