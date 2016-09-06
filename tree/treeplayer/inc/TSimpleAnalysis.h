@@ -12,11 +12,16 @@
 #ifndef ROOT_TSimpleAnalysis
 #define ROOT_TSimpleAnalysis
 
-/** \class TSimpleAnalysis
-A TSimpleAnalysis object permit to, given an input file,
-create an .root file in which are saved histograms
-that the user wants to create.
-*/
+//////////////////////////////////////////////////////////////////////////
+//                                                                      //
+// TSimpleAnalysis                                                      //
+//                                                                      //
+// A TSimpleAnalysis object allow to, given an input file, create a     //
+// .root file in which are saved histograms that the user wants to      //
+// create.                                                              //
+//                                                                      //
+//////////////////////////////////////////////////////////////////////////
+
 
 #include <string>
 #include <fstream>
