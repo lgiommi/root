@@ -16,12 +16,20 @@
 #include "TH1.h"
 #include "TError.h"
 #include "TKey.h"
+#include "ThreadPool.h"
+#include "TROOT.h"
 
 #include <string>
 #include <fstream>
 #include <vector>
 #include <map>
 #include <iostream>
+#include <chrono>
+
+using namespace std::chrono;
+using namespace std;
+
+high_resolution_clock::time_point startT, endT;
 
 /** \class TSimpleAnalysis
 
@@ -164,10 +172,10 @@ TSimpleAnalysis::TSimpleAnalysis(const std::string& output,
 static std::string ExtractTreeName(std::string& firstInputFile)
 {
    std::string treeName = "";
-   TFile inputFile (firstInputFile.c_str());
+   std::unique_ptr<TFile> inputFile{TFile::Open(firstInputFile.c_str())};
 
    // Loop over all the keys inside the first input file
-   for (TObject* keyAsObj : *inputFile.GetListOfKeys()) {
+   for (TObject* keyAsObj : *inputFile->GetListOfKeys()) {
       TKey* key = dynamic_cast<TKey*>(keyAsObj);
       TClass* clObj = TClass::GetClass(key->GetClassName());
       if (!clObj)
@@ -198,33 +206,42 @@ static std::string ExtractTreeName(std::string& firstInputFile)
 
 bool TSimpleAnalysis::Run()
 {
-   // Silence possible error message from TFile constructor if this is a tree name.
-   int oldLevel = gErrorIgnoreLevel;
-   gErrorIgnoreLevel = kFatal;
    // Disambiguate tree name from first input file:
    // just try to open it, if that works it's an input file.
    if (!fTreeName.empty()) {
+      // Silence possible error message from TFile constructor if this is a tree name.
+      int oldLevel = gErrorIgnoreLevel;
+      gErrorIgnoreLevel = kFatal;
       if (TFile* probe = TFile::Open(fTreeName.c_str())) {
-         fInputFiles.insert(fInputFiles.begin(), fTreeName);
-         fTreeName.clear();
+         if (!probe->IsZombie()) {
+            fInputFiles.insert(fInputFiles.begin(), fTreeName);
+            fTreeName.clear();
+         }
          delete probe;
       }
+      gErrorIgnoreLevel = oldLevel;
    }
+
    // If fTreeName is empty we try to find the name of the tree through reading
    // of the first input file
    if (fTreeName.empty())
       fTreeName = ExtractTreeName(fInputFiles[0]);
-   if (fTreeName.empty())  // No tree name found
+   if (fTreeName.empty()) // No tree name found
       return false;
-   gErrorIgnoreLevel = oldLevel;
 
    // Do the chain of the fInputFiles
-   TChain chain(fTreeName.c_str());
-   for (const std::string& inputfile: fInputFiles)
-      chain.Add(inputfile.c_str());
+   std::vector<std::pair<TChain*, TDirectory*>> vChains;
+   TChain *ch;
+   for (size_t i = 0; i < fInputFiles.size(); ++i){
+      const std::string& inputfile = fInputFiles[i];
+      ch = new TChain(fTreeName.c_str());
+      ch->Add(inputfile.c_str());
+      TDirectory* taskDir = gROOT->mkdir(TString::Format("TSimpleAnalysis_taskDir_%d", (int)i));
+      vChains.emplace_back(std::make_pair(ch, taskDir));
+   }
 
    // Sanity check that we can open the first file
-   int errValue = chain.LoadTree(0);
+   int errValue = vChains[0].first->LoadTree(0);
    if (errValue < 0) {
       ::Error("TSimpleAnalysis::Analyze",
               "The chain is not correctly set up, chain.LoadTree(0) returns %d", errValue);
@@ -237,18 +254,48 @@ bool TSimpleAnalysis::Run()
       return false;
    }
 
-   // Save the histograms into the output file
-   for (const auto &histo : fHists) {
-      const std::string& expr = histo.second.first;
-      const std::string& histoName = histo.first;
-      const std::string& cut = histo.second.second;
+  auto generateHisto = [&](const std::pair<TChain*, TDirectory*>& job){
+      TChain* chain = job.first;
+      TDirectory* taskDir = job.second;
+      taskDir->cd();
+      std::vector<TH1F *> vPtrHisto;
+      for (const auto &histo : fHists) {
+        const std::string& expr = histo.second.first;
+        const std::string& histoName = histo.first;
+        const std::string& cut = histo.second.second;
+//cout << "CHAIN DRAW ON " << chain->GetFile()->GetName() << '\n';
+        chain->Draw((expr + ">>" + histoName).c_str(), cut.c_str(), "goff");
+//cout << "DONE CHAIN DRAW ON " << chain->GetFile()->GetName() << '\n';
+        TH1F *ptrHisto = (TH1F*)taskDir->Get(histoName.c_str());
+        vPtrHisto.emplace_back(ptrHisto);
+      }
+      return vPtrHisto;
+   };
 
-      chain.Draw((expr + ">>" + histoName).c_str(), cut.c_str(), "goff");
-      TH1F *ptrHisto = (TH1F*)gDirectory->Get(histoName.c_str());
-      if (!ptrHisto)
-         return false;
-      ptrHisto->Write();
+  ROOT::EnableThreadSafety();
+   ThreadPool pool(3);
+   Info("Run", "Starting analysis with %d tasks", (int)vChains.size());
+startT = high_resolution_clock::now();
+   auto vFileswHists = pool.Map(generateHisto, vChains);
+endT = high_resolution_clock::now();
+   for (auto job: vChains) {
+     TFile* f = job.first->GetFile();
+     Info("Run", "Reading %lld bytes in %d transactions\n",f->GetBytesRead(), f->GetReadCalls());
    }
+
+   std::vector<TH1F *> vPtrHisto{vFileswHists[0]};
+
+   ofile.cd();
+   for (unsigned j = 0; j < fHists.size(); j++){
+     for (unsigned i = 1; i < vFileswHists.size(); i++){
+       if (!vFileswHists[i][j])
+          return false;
+       vPtrHisto[j]->Add(vFileswHists[i][j]);
+     }
+     vPtrHisto[j]->Write();
+   }
+duration<double> time_span = duration_cast<duration<double>>(endT - startT);
+cout<<"Time: "<<time_span.count()<<endl;
    return true;
 }
 
@@ -323,6 +370,7 @@ bool TSimpleAnalysis::Configure()
          // Set the input files
       case kReadingInput:
          if (!HandleInputFileNameConfig(line)) {
+cout<<line<<endl;
             // Not an input file name; try to parse as an expression
             errMessage = HandleExpressionConfig(line);
             readingSection = kReadingExpressions;
