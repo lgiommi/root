@@ -164,7 +164,7 @@ TSimpleAnalysis::TSimpleAnalysis(const std::string& output,
 static std::string ExtractTreeName(std::string& firstInputFile)
 {
    std::string treeName = "";
-   std::unique_ptr<TFile> inputFile{TFile::Open(firstInputFile.c_str())}
+   std::unique_ptr<TFile> inputFile{TFile::Open(firstInputFile.c_str())};
 
    // Loop over all the keys inside the first input file
    for (TObject* keyAsObj : *inputFile->GetListOfKeys()) {
