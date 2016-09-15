@@ -273,11 +273,10 @@ bool TSimpleAnalysis::Run()
    };
 
   ROOT::EnableThreadSafety();
-   ThreadPool pool(3);
+   ThreadPool pool(8);
    Info("Run", "Starting analysis with %d tasks", (int)vChains.size());
-startT = high_resolution_clock::now();
+   //startT = high_resolution_clock::now();
    auto vFileswHists = pool.Map(generateHisto, vChains);
-endT = high_resolution_clock::now();
    for (auto job: vChains) {
      TFile* f = job.first->GetFile();
      Info("Run", "Reading %lld bytes in %d transactions\n",f->GetBytesRead(), f->GetReadCalls());
@@ -294,8 +293,9 @@ endT = high_resolution_clock::now();
      }
      vPtrHisto[j]->Write();
    }
-duration<double> time_span = duration_cast<duration<double>>(endT - startT);
-cout<<"Time: "<<time_span.count()<<endl;
+   //endT = high_resolution_clock::now();
+   //duration<double> time_span = duration_cast<duration<double>>(endT - startT);
+   //cout<<"Time: "<<time_span.count()<<endl;
    return true;
 }
 

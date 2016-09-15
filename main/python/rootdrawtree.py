@@ -9,6 +9,7 @@ import ROOT
 import argparse
 import textwrap
 from sys import stderr
+import time
 
 parser = argparse.ArgumentParser(
      formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -42,7 +43,11 @@ if (args.configFile != '' and (args.output != '' or args.inputFiles != [] or arg
 if (args.configFile != ''):
 	a = ROOT.TSimpleAnalysis(args.configFile)
 	a.Configure()
+	start = time.time()
 	a.Run()
+	end = time.time()
+	print("Time for calling Run function: ")
+	print(end - start)
 else:
 	inputfile = ROOT.vector("string")(len(args.inputFiles))
 	for i,s in enumerate(args.inputFiles):
