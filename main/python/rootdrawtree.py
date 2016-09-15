@@ -5,7 +5,11 @@
 # Mail: luca.giommi2@studio.unibo.it
 # Date: 08/09/16
 
+import sys
+argvTmp = sys.argv[:]
+sys.argv = []
 import ROOT
+sys.argv = argvTmp
 import argparse
 import textwrap
 from sys import stderr
@@ -39,6 +43,7 @@ args = parser.parse_args()
 
 if (args.configFile != '' and (args.output != '' or args.inputFiles != [] or args.histoExpr != [] or args.tree != '')):
 	stderr.write("Error: both configuration file and options are provided \n")
+	exit(0)
 if (args.configFile != ''):
 	a = ROOT.TSimpleAnalysis(args.configFile)
 	a.Configure()
