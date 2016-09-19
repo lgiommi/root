@@ -258,8 +258,6 @@ bool TSimpleAnalysis::Run()
          "missing tree", // -4
          "internal error" // -5
          };
-   int errValue;
-   std::string errFile;
 
    // Save the histograms into the output file
    for (const auto &histo : fHists) {
@@ -271,6 +269,9 @@ bool TSimpleAnalysis::Run()
       TH1F *ptrHisto = (TH1F*)gDirectory->Get(histoName.c_str());
       if (!ptrHisto)
          return false;
+
+      int errValue;
+      std::string errFile;
       if (!checkChainLoadResult(chain, errValue, errFile)) {
          ::Error("TSimpleAnalysis::Run",
                  "Load failure in file %s: %s", errFile.c_str(), errors[-errValue]);
