@@ -17,6 +17,8 @@
 #include "TH1.h"
 #include "TError.h"
 #include "TKey.h"
+#include "ThreadPool.h"
+#include "TROOT.h"
 
 #include <string>
 #include <fstream>
@@ -276,8 +278,7 @@ bool TSimpleAnalysis::Run()
          chain->Draw((expr + ">>" + histoName).c_str(), cut.c_str(), "goff");
          TH1F *ptrHisto = (TH1F*)taskDir->Get(histoName.c_str());
          if (!ptrHisto)
-            return std::vector<TH1F *>();
-
+            continue;
          int errValue;
          std::string errFile;
          if (!checkChainLoadResult(chain, errValue, errFile)) {
@@ -290,7 +291,7 @@ bool TSimpleAnalysis::Run()
       return vPtrHisto;
    };
 
-#if 0
+#if 1
 
    ROOT::EnableThreadSafety();
    ThreadPool pool(8);
@@ -307,10 +308,8 @@ bool TSimpleAnalysis::Run()
    }
 
    auto vFileswHists = pool.Map(generateHisto, vChains);
-   if (vFileswHists.empty())
+   if (vFileswHists[0].empty())
       return false;
-   for (auto job: vChains)
-      TFile* f = job.first->GetFile();
 
    std::vector<TH1F *> vPtrHisto{vFileswHists[0]};
 
