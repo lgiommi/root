@@ -29,7 +29,6 @@
 #include <fstream>
 #include <vector>
 #include <map>
-#include "TChain.h"
 
 class TSimpleAnalysis {
 
@@ -56,7 +55,6 @@ private:
    std::string HandleExpressionConfig(const std::string& line);
    std::string GetLine(int& numbLine);
    bool HandleInputFileNameConfig(const std::string& line);
-   bool CheckChainLoadResult(TChain* chain);
    bool SetTreeName();
 
 

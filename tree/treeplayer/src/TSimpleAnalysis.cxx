@@ -198,7 +198,7 @@ static std::string ExtractTreeName(std::string& firstInputFile)
 ////////////////////////////////////////////////////////////////////////////////
 /// Returns true if there are no errors in TChain::LoadTree()
 
-bool TSimpleAnalysis::CheckChainLoadResult(TChain* chain)
+static bool CheckChainLoadResult(TChain* chain)
 {
    // Possible return values of TChain::LoadTree()
    static const char* errors[] {
