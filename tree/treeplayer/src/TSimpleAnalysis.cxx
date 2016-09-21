@@ -267,7 +267,7 @@ bool TSimpleAnalysis::Run()
          "internal error" // -5
          };
 
-   auto generateHisto = [&](const std::pair<TChain*, TDirectory*>& job){
+   auto generateHisto = [&](const std::pair<TChain*, TDirectory*>& job) {
       TChain* chain = job.first;
       TDirectory* taskDir = job.second;
       taskDir->cd();
@@ -291,7 +291,7 @@ bool TSimpleAnalysis::Run()
       return vPtrHisto;
    };
 
-#if 1
+#if 0
 
    ROOT::EnableThreadSafety();
    ThreadPool pool(8);
@@ -319,8 +319,8 @@ bool TSimpleAnalysis::Run()
    std::vector<TH1F *> vPtrHisto{vFileswHists[0]};
 
    ofile.cd();
-   for (unsigned j = 0; j < fHists.size(); j++){
-      for (unsigned i = 1; i < vFileswHists.size(); i++){
+   for (unsigned j = 0; j < fHists.size(); j++) {
+      for (unsigned i = 1; i < vFileswHists.size(); i++) {
          if (!vFileswHists[i][j]) {
             // ignore that sum histogram:
             delete vPtrHisto[j];
@@ -343,14 +343,11 @@ TChain* chain = new TChain(fTreeName.c_str());
 for (const std::string& inputfile: fInputFiles)
    chain->Add(inputfile.c_str());
 
-auto vHisto = generateHisto({chain,gDirectory});
+auto vHisto = generateHisto({chain, gDirectory});
 if (vHisto.empty())
    return false;
 for (auto histo: vHisto) {
-   if (!histo) {
-      delete histo;
-      continue;
-   }
+   if (histo)
    histo->Write();
  }
 
