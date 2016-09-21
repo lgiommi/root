@@ -198,18 +198,29 @@ static std::string ExtractTreeName(std::string& firstInputFile)
 ////////////////////////////////////////////////////////////////////////////////
 /// Returns true if there are no errors in TChain::LoadTree()
 
-static bool checkChainLoadResult(TChain* chain, int& errValue, std::string& errFile)
+bool TSimpleAnalysis::CheckChainLoadResult(TChain* chain)
 {
+   // Possible return values of TChain::LoadTree()
+   static const char* errors[] {
+         "all good", // 0
+         "empty chain", // -1
+         "invalid entry number", // -2
+         "cannot open the file", // -3
+         "missing tree", // -4
+         "internal error" // -5
+         };
+
+   bool ret = true;
    TObjArray *fileElements = chain->GetListOfFiles();
    TIter next(fileElements);
    while (TChainElement* chEl = (TChainElement*)next()) {
       if (chEl->GetLoadResult() < 0) {
-         errValue = chEl->GetLoadResult();
-         errFile = chEl->GetTitle();
-         return false;
+         ::Error("TSimpleAnalysis::Run", "Load failure in file %s: %s",
+                 chEl->GetTitle(), errors[-(chEl->GetLoadResult())]);
+         ret = false;
       }
    }
-   return true;
+   return ret;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -257,16 +268,6 @@ bool TSimpleAnalysis::Run()
       return false;
    }
 
-   // Possible return values of TChain::LoadTree()
-   static const char* errors[] {
-      "all good", // 0
-         "empty chain", // -1
-         "invalid entry number", // -2
-         "cannot open the file", // -3
-         "missing tree", // -4
-         "internal error" // -5
-         };
-
    auto generateHisto = [&](const std::pair<TChain*, TDirectory*>& job) {
       TChain* chain = job.first;
       TDirectory* taskDir = job.second;
@@ -279,13 +280,10 @@ bool TSimpleAnalysis::Run()
 
          chain->Draw((expr + ">>" + histoName).c_str(), cut.c_str(), "goff");
          TH1F *ptrHisto = (TH1F*)taskDir->Get(histoName.c_str());
-         int errValue;
-         std::string errFile;
-         if (!checkChainLoadResult(chain, errValue, errFile)) {
-            ::Error("TSimpleAnalysis::Run",
-                    "Load failure in file %s: %s", errFile.c_str(), errors[-errValue]);
+
+         if (!CheckChainLoadResult(chain))
             return std::vector<TH1F *>();
-         }
+
          vPtrHisto.emplace_back(ptrHisto);
       }
       return vPtrHisto;
