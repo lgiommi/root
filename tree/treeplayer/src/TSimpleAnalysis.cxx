@@ -17,7 +17,9 @@
 #include "TH1.h"
 #include "TError.h"
 #include "TKey.h"
+#ifdef R__USE_IMT
 #include "ThreadPool.h"
+#endif
 #include "TROOT.h"
 
 #include <string>
