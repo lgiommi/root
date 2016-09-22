@@ -58,7 +58,7 @@ hpxpy=px:py    #second histogram
 
 # End of the configuration file
 ```
-It is possible to use the script rootdrawtree that allow to use the class
+It is possible to use the script rootdrawtree that allows to use the class
 just in command line through the bash shell.
 */
 
